@@ -1,0 +1,16 @@
+# Flowdot
+
+> A tiny, zero-dependency framework and language (`.flow`) for animated architecture / data-flow
+> diagrams on HTML canvas 2D. Structure and behaviour are declared in `.flow` text and compiled to an
+> animated diagram — zero authored JavaScript.
+
+If you are an AI agent authoring a diagram, read these two in order:
+
+## Docs
+- [AI-AUTHORING.md](docs/AI-AUTHORING.md): the mistake-free playbook — mental model, the closed verb set, every feature (incl. controls) with a minimal snippet, pitfalls, and a pre-flight checklist. Start here.
+- [API.md](docs/API.md): the full grammar and surface — the three ways to build a diagram (imperative, IR builder, `.flow`), the per-kind attribute reference, and the action vocabulary.
+
+## Optional
+- [FLOW-FORMAT.md](docs/FLOW-FORMAT.md): the `.flow` grammar in detail.
+- [HOWTO.md](docs/HOWTO.md): each feature with a minimal snippet and a live example.
+- [ERRORS.md](docs/ERRORS.md): every located error message and what triggers it.

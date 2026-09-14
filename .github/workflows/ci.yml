@@ -1,0 +1,38 @@
+# Flowdot public CI — the public repo ships prebuilt bundles (no src/, no tests), so CI's job is to
+# smoke-check that every shipped bundle actually loads and exposes the API.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  bundles-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: CommonJS bundle loads (require)
+        run: node -e "const f=require('./dist/flowdot.cjs'); if(!f.Flow||!f.SceneBuilder||!f.Diagram) throw new Error('CJS bundle missing exports'); console.log('cjs ok')"
+
+      - name: ESM bundle loads (import)
+        run: node --input-type=module -e "import * as f from './dist/flowdot.mjs'; if(!f.Flow||!f.SceneBuilder||!f.Diagram) process.exit(1); console.log('esm ok')"
+
+      - name: UMD bundle attaches browser globals
+        run: node -e "const vm=require('vm'),fs=require('fs');const s={};vm.createContext(s);vm.runInContext(fs.readFileSync('./dist/flowdot.js','utf8'),s);if(!s.Flowdot||!s.SceneBuilder||!s.Flow)throw new Error('UMD bundle did not attach globals');console.log('umd ok')"
+
+      - name: minified bundles load (CDN + ESM)
+        run: |
+          node -e "const vm=require('vm'),fs=require('fs');const s={};vm.createContext(s);vm.runInContext(fs.readFileSync('./dist/flowdot.min.js','utf8'),s);if(!s.Flowdot||!s.SceneBuilder||!s.Flow)throw new Error('min UMD did not attach globals');console.log('min.js ok')"
+          node --input-type=module -e "import * as f from './dist/flowdot.min.mjs'; if(!f.Flow||!f.SceneBuilder||!f.Diagram) process.exit(1); console.log('min.mjs ok')"
+
+      - name: package.json main resolves
+        run: node -e "const f=require('./'); if(!f.Flow) throw new Error('package main did not resolve to a working bundle'); console.log('main ok')"
+
+      - name: a diagram round-trips (parse then build)
+        run: |
+          node -e "const f=require('./dist/flowdot.cjs'); const ir=f.Flow.parse('diagram \"x\" 200x100 dark\nnode a box name:\"A\"\nnode b core name:\"B\"\nedge a.out -> b.in\nflow t rate:1 : a ~0.5 b'); const b=f.SceneBuilder.build(ir); f.SceneBuilder.buildFlows(ir,{byId:b.byId,diagram:b.diagram}); if(ir.nodes.length!==2) process.exit(1); console.log('round-trip ok')"

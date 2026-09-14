@@ -1,0 +1,33 @@
+# Flowdot publish — cut a release by pushing a semver tag (e.g. `v0.6.0`). Publishes the prebuilt
+# package to npm via Trusted Publishing (OIDC) — no token secret; provenance is automatic.
+# One-time setup: on npmjs.com → the `flowdot` package → configure a trusted publisher pointing at
+# this repo + workflow file `release.yml`.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write            # OIDC for npm Trusted Publishing (auto-provenance, no token)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22            # Trusted Publishing needs Node >= 22.14
+          registry-url: https://registry.npmjs.org
+
+      - run: npm install -g npm@latest  # Trusted Publishing needs npm >= 11.5.1
+
+      - name: Bundles load (gate before publish)
+        run: |
+          node -e "const f=require('./dist/flowdot.cjs'); if(!f.Flow||!f.SceneBuilder||!f.Diagram) process.exit(1)"
+          node --input-type=module -e "import * as f from './dist/flowdot.mjs'; if(!f.Flow||!f.SceneBuilder||!f.Diagram) process.exit(1)"
+
+      - name: Publish to npm (Trusted Publishing → provenance is automatic)
+        run: npm publish --access public

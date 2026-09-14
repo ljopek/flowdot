@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — examples</title>
+<!-- Two-pane gallery: the list on the left opens each example in the <iframe> on the right. Zero
+     JavaScript — anchors target the named iframe, so it works from file:// too. Generated from the
+     curated example manifest by tools/build.js; edit the manifest, not this file. -->
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100vh;background:#060910;color:#e8f0fb;font:13px/1.55 ui-monospace,monospace}
+  .app{display:flex;height:100vh}
+  aside{width:340px;flex:0 0 340px;overflow-y:auto;padding:18px 16px;border-right:1px solid #16222f;background:#080c14}
+  main{flex:1;min-width:0;display:flex;flex-direction:column}
+  main .bar{padding:8px 14px;border-bottom:1px solid #16222f;color:#93a6bd;font-size:12px}
+  iframe{flex:1;width:100%;border:0;background:#0b1119}
+  h1{font-size:16px;font-weight:600;margin:0 0 2px}
+  .sub{color:#93a6bd;margin:0 0 14px;font-size:11.5px}
+  h2{font-size:11px;font-weight:600;color:#93a6bd;text-transform:uppercase;letter-spacing:.06em;margin:20px 0 6px}
+  a.card{display:block;text-decoration:none;color:inherit;border:1px solid #16222f;border-radius:8px;
+    padding:8px 11px;margin:6px 0;background:#0d131e}
+  a.card:hover{border-color:#4d9bff;background:#101a28}
+  .name{color:#5cb4ff;font-weight:600}
+  .desc{color:#93a6bd;margin-top:1px;font-size:11.5px}
+  code{color:#ffd24a}
+  .docs{color:#93a6bd;margin-top:22px;font-size:12px}
+  .docs a{color:#5cb4ff}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Flowdot examples</h1>
+    <p class="sub">Click any example — it opens in the pane on the right. Every example is
+      <b>zero-JavaScript</b> and shows its <code>.flow</code> source below the diagram.</p>
+
+    <h2>Structure</h2>
+    <a class="card" href="hello-world/index.html" target="fvp"><div class="name">hello-world</div><div class="desc">The smallest diagram — a node, an edge, a flow. One source → one worker.</div></a>
+    <a class="card" href="zones/index.html" target="fvp"><div class="name">zones</div><div class="desc">Labelled grouping bands that infer their box from the lanes they span.</div></a>
+    <a class="card" href="comprehensions/index.html" target="fvp"><div class="name">comprehensions</div><div class="desc"><code>set</code>, <code>each … in</code>, and <code>{expr}</code> — a 3×3 grid from six lines.</div></a>
+
+    <h2>Layout</h2>
+    <a class="card" href="auto-layout/index.html" target="fvp"><div class="name">auto-layout</div><div class="desc">Place nodes by <code>lane</code> × <code>rail</code> — no coordinates. Zero-JS auto-boot.</div></a>
+
+    <h2>Behaviour</h2>
+    <a class="card" href="flow-pick/index.html" target="fvp"><div class="name">flow-pick</div><div class="desc">A weighted <code>|</code> pick — each packet takes one branch (80/20, seeded).</div></a>
+    <a class="card" href="flow-fanout/index.html" target="fvp"><div class="name">flow-fanout</div><div class="desc">A <code>&amp;</code> fan-out — a copy of every packet to every subscriber.</div></a>
+    <a class="card" href="flow-actions/index.html" target="fvp"><div class="name">flow-actions</div><div class="desc">Hop <code>{ count …; push … }</code> actions mutate the runtime state store.</div></a>
+    <a class="card" href="flow-schedule/index.html" target="fvp"><div class="name">flow-schedule</div><div class="desc"><code>spawn</code> a secondary packet and <code>after D:</code> schedule an event.</div></a>
+    <a class="card" href="flow-events/index.html" target="fvp"><div class="name">flow-events</div><div class="desc"><code>drop if rand()&lt;0.2</code> and an <code>on &lt;event&gt;</code> handler.</div></a>
+    <a class="card" href="periodics/index.html" target="fvp"><div class="name">periodics</div><div class="desc">Tiered <code>every … per … when</code> drainers, each on its own timer.</div></a>
+
+    <h2>Controls</h2>
+    <a class="card" href="controls/index.html" target="fvp"><div class="name">transport-controls</div><div class="desc">One <code>controls</code> line auto-renders a play/pause · reset · speed bar (zero-JS).</div></a>
+    <a class="card" href="modes/index.html" target="fvp"><div class="name">modes</div><div class="desc">A <code>storm</code> mode toggle — sources fire faster while active.</div></a>
+
+    <h2>Theming</h2>
+    <a class="card" href="palette-colors/index.html" target="fvp"><div class="name">palette-colors</div><div class="desc">A named <code>palette</code>, accent-by-index, and a literal <code>#hex</code> override.</div></a>
+    <a class="card" href="branded/index.html" target="fvp"><div class="name">branded</div><div class="desc">A registered theme pack (<code>diagram … corporate</code>) re-skins the whole diagram. Ships dark/light/corporate.</div></a>
+
+    <p class="docs">Docs: <a href="../docs/API.md" target="_blank">API.md</a> ·
+      <a href="../docs/AI-AUTHORING.md" target="_blank">AI-AUTHORING.md</a> ·
+      <a href="../docs/HOWTO.md" target="_blank">HOWTO.md</a> ·
+      <a href="../docs/FLOW-FORMAT.md" target="_blank">FLOW-FORMAT.md</a> ·
+      <a href="../docs/ERRORS.md" target="_blank">ERRORS.md</a></p>
+  </aside>
+  <main>
+    <div class="bar">Tip: middle-click (or ⌘/Ctrl-click) any example to open it in its own tab.</div>
+    <iframe name="fvp" title="Flowdot example preview" src="hello-world/index.html"></iframe>
+  </main>
+</div>
+</body>
+</html>

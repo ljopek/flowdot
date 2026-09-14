@@ -1,0 +1,37 @@
+/* Shared tutorial shell for the zero-JS Flowdot examples. Each page links this, drops in a
+ * <script type="text/flow" data-flowdot data-source="#src"> block, and puts a <textarea class="src"
+ * id="src" readonly> below it — the library mirrors the source into the textarea (and Phase 7 makes
+ * that textarea live-editable). Keeps every example uniform with one file. */
+:root{
+  --bg:#060910; --fg:#e8f0fb; --muted:#93a6bd; --line:#16222f; --panel:#0f1724;
+  --hot:#58a6ff; --bad:#ff9db1; --acc:#f2cc60;
+}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.wrap{max-width:900px;margin:0 auto;padding:18px}
+h1{font-size:15px;font-weight:600;margin:0 0 2px}
+.sub{color:var(--muted);margin:0 0 14px}
+.sub b{color:var(--fg)}
+code{color:var(--acc)}
+canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:10px;
+  background:radial-gradient(1200px 500px at 46% -8%,#0e1622 0%,var(--bg) 62%)}
+/* the library inserts <div class="flow-modes"> with a <button class="flow-mode"> per declared mode */
+.flow-modes{display:flex;gap:8px;margin:10px 0}
+.flow-mode,.flow-export{background:var(--panel);color:var(--fg);border:1px solid #23324a;border-radius:7px;
+  padding:5px 14px;font:inherit;font-size:12px;cursor:pointer;text-transform:capitalize}
+.flow-export{margin:10px 0}
+.flow-mode:hover{border-color:var(--hot)}
+.flow-mode.on{border-color:var(--bad);color:var(--bad);background:#1a0e14}
+/* the library inserts <div class="flow-transport"> (play/pause · reset · speed) when opted in */
+.flow-transport{display:flex;gap:8px;margin:10px 0}
+.flow-transport button{background:var(--panel);color:var(--fg);border:1px solid #23324a;border-radius:7px;
+  padding:5px 14px;font:inherit;font-size:12px;cursor:pointer}
+.flow-transport button:hover{border-color:var(--hot)}
+.flow-speed.on{border-color:var(--hot);color:var(--hot);background:#0e1622}
+/* the source panel: a textarea (not a static <pre>) so Phase 7 can make it live-editable */
+.src-label{color:var(--muted);margin:14px 0 4px;font-size:12px}
+.src{display:block;width:100%;box-sizing:border-box;min-height:max(460px,60vh);background:#0b1119;color:#c9d6e8;
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;resize:vertical;
+  font:12px/1.5 ui-monospace,monospace}
+/* live-edit: the library inserts this after the panel to show a parse/build error (previous diagram stays) */
+.flow-error{margin-top:8px;padding:8px 12px;border:1px solid var(--bad);border-radius:8px;
+  background:#1a0e14;color:var(--bad);font:12px/1.4 ui-monospace,monospace;white-space:pre-wrap}

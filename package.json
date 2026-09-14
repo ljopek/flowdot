@@ -1,0 +1,51 @@
+{
+  "name": "flowdot",
+  "version": "0.6.0",
+  "description": "A tiny framework + language for animated architecture / data-flow diagrams on HTML canvas 2D.",
+  "type": "commonjs",
+  "private": false,
+  "license": "MIT",
+  "main": "dist/flowdot.cjs",
+  "module": "dist/flowdot.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/flowdot.mjs",
+      "require": "./dist/flowdot.cjs",
+      "browser": "./dist/flowdot.min.js",
+      "unpkg": "./dist/flowdot.min.js",
+      "jsdelivr": "./dist/flowdot.min.js",
+      "default": "./dist/flowdot.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "browser": "dist/flowdot.min.js",
+  "unpkg": "dist/flowdot.min.js",
+  "jsdelivr": "dist/flowdot.min.js",
+  "files": [
+    "dist",
+    "docs",
+    "examples",
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ljopek/flowdot.git"
+  },
+  "homepage": "https://github.com/ljopek/flowdot",
+  "bugs": "https://github.com/ljopek/flowdot/issues",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "diagram",
+    "animation",
+    "canvas",
+    "architecture",
+    "dataflow",
+    "dsl",
+    "visualization"
+  ]
+}

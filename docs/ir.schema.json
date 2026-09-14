@@ -1,0 +1,332 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowdot.dev/ir.schema.json",
+  "title": "Flowdot IR",
+  "description": "Parsed .flow IR consumed by SceneBuilder.build(). Node per-kind keys and zone keys are generated from Flow.KIND_KEYS by tools/ir-schema.js — do not hand-edit; run `node tools/ir-schema.js --update`.",
+  "type": "object",
+  "required": [
+    "nodes"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "theme": {
+      "type": "string"
+    },
+    "width": {
+      "type": "number"
+    },
+    "height": {
+      "type": "number"
+    },
+    "seed": {
+      "type": "number"
+    },
+    "model": {
+      "type": "string"
+    },
+    "behavior": {
+      "type": "boolean"
+    },
+    "controls": {
+      "type": "boolean"
+    },
+    "palette": {
+      "type": "object"
+    },
+    "zones": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/zone"
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/track"
+      }
+    },
+    "rails": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/track"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "flows": {
+      "type": "array"
+    },
+    "modes": {
+      "type": "array"
+    },
+    "periodics": {
+      "type": "array"
+    },
+    "events": {
+      "type": "array"
+    }
+  },
+  "$defs": {
+    "track": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    },
+    "zone": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {},
+        "kind": {},
+        "x": {},
+        "y": {},
+        "w": {},
+        "h": {},
+        "label": {},
+        "tint": {},
+        "accent": {},
+        "inspect": {},
+        "hoverable": {},
+        "lane": {},
+        "lanes": {},
+        "rail": {},
+        "rails": {}
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "box",
+            "core",
+            "ring",
+            "matrix",
+            "pipeline"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "box"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "name": {},
+              "sub": {},
+              "accent": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "core"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "name": {},
+              "sub": {},
+              "accent": {},
+              "lit": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "ring"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "slots": {},
+              "r": {},
+              "color": {},
+              "label": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "matrix"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "rows": {},
+              "cols": {},
+              "cw": {},
+              "ch": {},
+              "gap": {},
+              "colColors": {},
+              "rowLabels": {},
+              "colLabels": {},
+              "title": {},
+              "subtitle": {},
+              "cellNote": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "pipeline"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "stages": {},
+              "nodeR": {},
+              "idle": {},
+              "vertical": {},
+              "boxed": {},
+              "pinned": {},
+              "name": {},
+              "accent": {},
+              "pad": {},
+              "step": {}
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  }
+}
