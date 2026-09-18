@@ -56,7 +56,9 @@ periodics → afterFrame).
 animation reproducible frame-for-frame.
 
 ### `Theme`, `Tween`, `Draw`
-`Theme` — palette by role (`bg, panel, line, text, muted, hot, bad, accent, series[]`).
+`Theme` — colours by role (`bg, panel, line, text, muted, hot, bad, accent, series[]`) plus a `colors`
+token map (`emerald, sky, violet, amber, rose, mint, lime, azure, bronze`). `resolveColor(value, theme)`
+maps a `#`-sigil colour against a theme (`#token`/`#role`/`#series<N>` map; `#hex`/`#css-name` literal).
 `Tween` — `ease, lerp, lerpPt, mix, clamp01` (pure). `Draw` — `roundRect, box, text, glow, link`.
 
 ---
@@ -137,7 +139,10 @@ const { ir, diagram, rt, byId, dispose } = Flowdot.mount(target, source, opts);
 ```
 It inserts a `<canvas>` after each marked source and mounts it (handle stashed on `canvas.__flowdot`).
 `data-seed` seeds the PRNG; `data-source="#sel"` fills that element with the source (a zero-JS
-"view the source" panel).
+"view the source" panel). Further **opt-in library controls** (each also renders zero-JS from the marker
+or a source line): `data-controls` / a `controls` line → a play/pause·reset·speed transport bar;
+`data-export` → a save-PNG button; `data-theme-toggle` / a `theme-toggle` line → a **dark↔light toggle**
+button (shows the active theme; a click re-mounts the source with the theme flipped). See `examples/theme-light`.
 The `data-flowdot` marker is **opt-in**, so a page with its own bespoke mount is never double-mounted.
 `boot(root?, mountFn?)` is parameterisable for testing. See `examples/auto-layout` (zero-JS auto-boot)
 and `examples/hello-world` (the smallest zero-JS diagram).
@@ -150,23 +155,22 @@ and `examples/hello-world` (the smallest zero-JS diagram).
 
 ```flow
 diagram "Title" 1200x600 dark
-palette series = #5ef2a0 #5cb4ff #c98cff
 set feeds = Alpha Beta Gamma
 rails = 150 320 490
 each f in 0..2:
-  node src{f} pipeline x:44 y:{rails[f]} w:150 h:72 name:"{feeds[f]}" accent:series{f} boxed vertical stages:[decode, transform, emit]
-  road src{f} ~> hub{f} color:series{f} width:14 label:"link {7001+f}"
-  edge hub{f}.out -> grid.colTop:{f} alpha:0.18
+  node src{f} pipeline x:44 y:{rails[f]} w:150 h:96 name:"{feeds[f]}" #series{f} boxed vertical stages:[decode, transform, emit]
+  road src{f} ~> hub{f} #series{f} width:14 label:"link {7001+f}"
+  edge hub{f} -> grid.colTop:{f} alpha:0.18
 zone sources "Sources" x:14 y:60 w:206 h:520
 ```
-- **Statements:** `flow · diagram · palette · set · lane · rail · zone · node · edge (->) · road (~>) · flow · import`.
+- **Statements:** `flow · diagram · set · lane · rail · zone · node · edge (->) · road (~>) · flow · colors · import`.
 - **Version & compatibility:** the format is **semver'd** — this build is **`flowdot 1.0`**. A source may
   declare `flowdot <version>` (e.g. `flowdot 1`) as the first statement; it records `ir.version` and **throws
   on an unsupported major** (`this build supports flowdot 1.x`). Policy: a **minor** bump is additive /
   backward-compatible (new statements/attributes; old sources keep working); a **major** bump is
   breaking. The pragma is optional — omit it and a source is parsed as current. (`Flow.SPEC_VERSION` /
   `Flow.SPEC_MAJOR` expose the supported version.)
-- **Modules:** `import "<path.flow>"` inlines a shared source (a palette / node library) before parsing.
+- **Modules:** `import "<path.flow>"` inlines a shared source (a node/theme library) before parsing.
   Resolution: `Flow.parse(text, { base, resolveImport })` — under node, files resolve via `fs` relative to
   `base` (the importing file's dir); in the browser, supply `resolveImport(path, base) → text` (parsing is
   synchronous, so fetch/preload the imports first). Cycles and missing files throw; **safe mode disables it**.
@@ -176,13 +180,45 @@ zone sources "Sources" x:14 y:60 w:206 h:520
   nodes in a lane with no rail auto-stack down it (and the transpose across a shared rail).
 - **Behaviour:** `flow · mode · seed · behavior · on · every · model` and hop `{ actions }` — the
   full temporal language, specified in **[The `.flow` behaviour block](#the-flow-behaviour-block)** below.
-- **Values coerce:** `12`→number, `#abc`→colour, `series1`→palette ref, `[a, b, "c d"]`→array
+- **Values coerce:** `12`→number, `#…`→colour token, `[a, b, "c d"]`→array
   (comma/space-separated, elements coerce), `"x"`→string (quotes are *always* literal),
-  a bare token on a node → boolean flag (`boxed`, `vertical`, `pinned`). An out-of-range palette
-  ref throws. (`|` means *only* the flow pick — see Behaviour.)
+  a bare token on a node → boolean flag (`boxed`, `vertical`, `pinned`). (`|` means *only* the flow pick — see Behaviour.)
+- **Colours:** every colour carries a **`#` sigil** and is one of: a **`#hex`** (literal), a **theme token**
+  (`#sky`, `#emerald` — MAPS per theme), a **`#series<N>`** ramp index (maps), a **role** (`#text`, `#muted`,
+  `#accent` — maps), or a **CSS/PlantUML name** (`#steelblue` — literal). A token/name that resolves to nothing
+  (a typo like `#skyy`) **throws** at build (`unknown colour`). See [`examples/swatches`](../examples/swatches/index.html)
+  for every predefined colour.
+  - **One spelling — a bare `#token`:** on any element line, a keyless `#token` **is** its colour — `node q core #sky`,
+    `road a ~> b #emerald`, `flow f #rose : …`. It maps to that kind's colour (box/core/pipeline/zone border,
+    ring/road/flow fill, edge line). The older keyed forms (`accent:#sky`, `color:#emerald`, `colColors:[…]`,
+    `tint:`, edge `c:`) still parse. **Comment caveat:** a comment starts at a **standalone `#`** (`… # note` —
+    put a space after the hash); a glued `#word` is read as a colour.
+  - **Per-kind defaults:** every kind has a themed default colour, so a diagram that names **no** colours still
+    renders fully themed. Override a whole kind for the diagram with **`colors <kind>:#tok …`** (kinds:
+    `box core ring pipeline zone road edge`), layered over the theme — see [`examples/recolor`](../examples/recolor/index.html).
+  - **Resolution order** (most specific first): inline `#token` on the element → the diagram's `colors` per-kind
+    override → the theme's per-kind default → the theme role. Overrides are stored raw, so they **re-map when the
+    theme flips**.
+- **Roads:** `road a ~> b` draws a fat animated channel; **`width:N`** sets its stroke (default 16); `#token`
+  sets its colour. (`width` must be a positive number.)
+- **Edges:** `edge a -> b` draws a thin connector. Attributes (an unknown one **throws** — no silent-swallow):
+  `label:"…"` (a chip at the midpoint), `dashed` (a bare flag — async/lossy), `alpha:0..1` (opacity),
+  `#token` colour (→ the line, e.g. `#rose` for an error path), `dash:[on,off]`, `pulseColor:#…`, `lw:N`.
+- **Themes:** `diagram "T" WxH <theme>` selects a shipped scheme — **`dark`** (default) or **`light`** —
+  which re-skins the whole diagram (background, panels, lines, text, cell fills). Register
+  your own house style with `Flowdot.registerTheme(name, { bg, panel, line, text, accent, series:[…], … })`
+  (a named theme overlays the default, so it may be partial). Every draw reads the resolved `env.theme`, so a
+  scheme recolours *all* built-in kinds. See [`examples/branded`](../examples/branded/index.html)
+  and [`examples/theme-light`](../examples/theme-light/index.html) (light).
 - **Comprehensions:** `each VAR in 0..N` / `each VAR in <list>` (indent-delimited, nestable),
   `{expr}` interpolation with numbers, bound vars, `list[i]`, and `+ - * / %`.
-- **Refs:** `id`, `id.port`, or `x,y`; a bare id defaults to `.out` (from) / `.in` (to).
+- **Refs:** `id`, `id.port`, or `x,y`; a bare id defaults to `.out` (from) / `.in` (to) — so `edge a -> b`
+  is `a.out -> b.in` (out on the right, in on the left). Name a port (`a.top`, `grid.rowRight:2`, `pipe.join`)
+  only to override this for non-left-to-right layouts.
+- **Auto-edges:** an `auto-edges` line draws a faint connector under every `flow` route hop (incl. `|` pick
+  and `&` fan-out branches) automatically, so you can drop the duplicated `edge a -> b` lines — the flow
+  route already declares the topology. An explicit `edge`/`road` between a pair still wins (keeps its style);
+  templated hops (`worker{f}`) are skipped. Off unless opted in, so existing diagrams are unchanged.
 
 ---
 
@@ -199,15 +235,22 @@ Everything above is **structure**. Behaviour — how packets move and how named 
 | `seed` | `seed 42` · `seed 0x51F0` | seed the runtime RNG (reproducible `pick` / `rand()`); decimal or hex |
 | `behavior` | `behavior` · `behavior seed:42` | optional section header; may carry `seed:` inline |
 | `mode` | `mode storm: spawn x4` | a togglable mode (below); `boot()` auto-renders a toggle button per mode |
-| `flow` | `flow <id> rate:R [color:C r:N max:M] [pick …] : <route>` | a rate-driven packet along a route (below) |
+| `flow` | `flow <id> rate:R [color:C r:N max:M] [pick …] : <route>` | emits a packet along a route at **R packets/second** (`interval = 1/R`, R > 0; below) |
 | `on` | `on <event>[(p1,p2)]: <actions>` | a named event handler, fired by `after … : <event>` (or `rt.emit`) |
-| `every` | `every <rate> per <v> in [list] [when <cond>]: <actions>` | a per-entity periodic: fires for each element at `rate` while the guard holds |
+| `every` | `every <seconds> per <v> in [list] [when <cond>]: <actions>` | a per-entity periodic: fires for each element **every N seconds** (a period, *not* a per-second rate) while the guard holds |
 | `model` | `model "./m.js"` · `model MyGlobal` | Tier-2 host escape — names a companion module for `call` (node `require` / browser global) |
+| `join` | `join <node> : <inputA> <inputB> …` | fan-in **barrier** — the node fires only once **every** named input has arrived (≥2 inputs); the dual of a `&` fan-out |
 
 **Modes.** `mode <name>: <effect>[; <effect>]`. Effects: `spawn xN` → while the mode is active every
 flow source fires **N× faster** (`op:'rate'`). `tier>=k drain xM` parses to a `drainMul` effect
 (reserved; not yet wired to periodics). Toggle at runtime with `rt.setMode(name, on)` / read with the
 `mode(name)` expression built-in.
+
+**Timing model — three distinct knobs.** `flow … rate:R` is a **frequency**: R packets per **second**
+(`rate:2` = 2/s, `rate:0.1` = 1 per 10s; `interval = 1/R`, and R must be > 0 or it throws). `every N …`
+is a **period**: it fires every **N seconds** (`every 0.5` = twice a second) — despite the shape, it is
+*not* a per-second rate. `mode … spawn xN` is a **multiplier**: while active it speeds every flow source
+**×N**. `~dur` on a hop is the seconds that hop takes. These are the only timing controls.
 
 ### Routes, hops, forks
 
@@ -217,11 +260,21 @@ A **route** is a chain of nodes joined by `~dur` hops (seconds): `A ~0.6 B ~0.5 
   actions on the **first** node run at packet birth: `A { count sent } ~0.5 B { push q; count in }`.
 - **Forks.** A route may end in **one** fork off its last node (options are homogeneous):
   - weighted **pick** `|`: `… ~0.5 ok @0.75 | ~0.5 fail @0.25` — exactly one branch per packet, chosen by `@weight` (default 1).
+  - **guarded pick** `| when`: `… ~0.5 review when amt>5 | ~0.5 auto` — **deterministic, content-based**
+    routing: the packet takes the **first** branch whose `when <cond>` predicate holds (reusing the
+    `when`/`drop if` expression grammar, so pick vars / store / `rand()` are in scope); an **unguarded**
+    branch is the else/default. Guards are `|`-only (not `&`), and replace weighting when present.
   - **fan-out** `&`: `… ~0.5 a & ~0.5 b & ~0.5 c` — a copy to **every** branch.
   - a fork option may also carry `{ actions }`: `… ok @0.7 { spawn s ~0.4 c } | ~0.5 fail { after 0.6: retry }`.
 - **Per-fire entity pick.** `pick v in [list]` (before the `:`) binds `v` to a random list element each
   time the flow fires; reference it as `{v}` in a route node id — e.g. `flow f pick p in [p1, p2] : {p} …`
   makes a randomly-chosen producer the origin. Multiple: `pick f in [..], p in [..]`.
+- **Fan-in / join (barrier).** The **dual** of a `&` fan-out: `join <node> : <inputA> <inputB> …`
+  (a top-level statement, ≥2 inputs) makes `<node>` a barrier — a packet arriving from a named input
+  **parks silently** until every named input has arrived, and only then does the node pulse and run its
+  arrival actions (scatter-gather, stream join, enrichment, quorum). Arrivals are deduped by input id and
+  the barrier resets after each complete set. Route the inputs into the join node with ordinary flows
+  (`flow a … : … ~0.5 gather`); an unknown join node or input throws a located build error.
 
 ### Actions — the closed verb vocabulary
 
@@ -270,8 +323,8 @@ Used in `drop if`, `when <cond>`, the RHS of `set`/`write`, `call` args, and `{e
 | `@w` | pick-branch weight |
 | `\|` · `&` | weighted-pick · fan-out fork |
 | `{ verb … }` | on-arrival action block (verb-led) |
-| `{ expr }` | interpolation — arithmetic, `list[i]`, bound vars, palette index |
-| `name0` | palette ref (name + index) |
+| `{ expr }` | interpolation — arithmetic, `list[i]`, bound vars, ramp index |
+| `#sky` · `#series0` | colour token · theme-ramp index (both map per theme) |
 
 **Worked, zero-JS examples:** browse the [example gallery](../examples/index.html) — one feature per
 example, grouped by category (structure · layout · behaviour · controls · theming), each rendered live
@@ -281,10 +334,12 @@ with its `.flow` source. Every feature also has a minimal snippet in [`HOWTO.md`
 
 ## Per-kind attribute reference
 
-Every `node <id> <kind> …` / `zone …` attribute the parser accepts, per built-in kind. A **misspelled
+Every `node <id> [<kind>] …` / `zone …` attribute the parser accepts, per built-in kind.
+The kind is **optional** — it defaults to `box`. Omit it when the next token is a `key:value`
+attribute or a bare `#colour`: `node producer lane:src #sky` parses as `kind='box'`. A **misspelled
 or unknown key on a built-in kind is a loud, located error** (listing the valid keys) — this table is
 the closed set. Custom (registered) kinds are not validated. Types: `num`, `str`, `bool`, `colour`
-(`#hex` or a `palette` ref), `id` (a lane/rail id), `list` (a `[bracket list]`), `fn` (a template
+(a `#`-sigil value: `#hex`, a theme token like `#sky`, a role like `#muted`, or a CSS name like `#steelblue`), `id` (a lane/rail id), `list` (a `[bracket list]`), `fn` (a template
 `(i,j)=>…`). This section is kept in lock-step with the parser schema by a parity test
 (`src/kind-schema.test.js`).
 
@@ -380,6 +435,25 @@ A labelled background band (added behind the nodes). Accepts `x y w h inspect ho
 | `lanes` | list | — | span several lanes: `lanes:[fe, be]` → `x`/`w` cover their union |
 | `rail` | id | — | span this rail's row — infers `y`/`h` (explicit wins); with no rail, a lane-zone gets a full-height band |
 | `rails` | list | — | span several rails: `rails:[top, bot]` → `y`/`h` cover their vertical extent |
+
+### edge (`->`, a `Connector`)
+
+`edge a -> b …` / an auto-derived connector. An unknown key **throws** (no silent-swallow).
+
+| key | type | default | notes |
+|---|---|---|---|
+| `label` | str | — | a chip drawn at the midpoint |
+| `alpha` | num | `0.18` (auto-derived `0.2`) | line opacity, `0..1` (`0` = invisible, `1` = solid) |
+| `dashed` | bool | `false` | bare flag → a default dash (async/lossy edge) |
+| `dash` | list | — | explicit `[on, off]` dash pattern |
+| `#token` | colour | theme `edge` | the line colour (e.g. `#rose` for an error path) |
+| `pulseColor` | colour | theme accent | the travelling-dot glow colour |
+| `lw` | num | `1.3` | line width |
+
+### road (`~>`, a `Channel`)
+
+`road a ~> b …` — the fat animated channel packets ride. Honours **`width:N`** (stroke, default 16) and a
+`#token` colour; the edge keys above (incl. `alpha`) are accepted but only the `Connector` renders them.
 
 ---
 

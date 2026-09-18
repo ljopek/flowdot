@@ -27,7 +27,7 @@ Below: the hazards found in the format, the fixes applied in v1, and what is del
 ## Fixes applied in v1 (the format is now `.flow`)
 
 1. **Arrays are bracketed, comma- or space-separated:** `stages:[decode, transform, "final emit"]`,
-   `dash:[3, 4]`. Elements coerce individually (numbers, `#hex`, palette refs, quoted strings).
+   `dash:[3, 4]`. Elements coerce individually (numbers, `#colour` tokens, quoted strings).
 2. **Quotes are always a literal string** — `name:"buy|sell"` is the string `buy|sell`, never an array.
 3. **`|` is reserved for the `flow` pick** (`a @0.8 | b @0.2`); `&` for fan-out. No other meaning.
 4. **A known-palette ref that is out of range throws** a clear error instead of leaking a string.
@@ -39,8 +39,13 @@ Below: the hazards found in the format, the fixes applied in v1, and what is del
    still wins per field when exact control is needed. (See `docs/API.md` → *Auto-layout*.)
 
 The result: for every value there is exactly one obvious spelling, `|` has a single meaning, and the
-three previously-silent failure modes (pipe-in-quotes, out-of-range palette, `/`-in-expression from
+three previously-silent failure modes (pipe-in-quotes, out-of-range colour ref, `/`-in-expression from
 the earlier hardening pass) now error.
+
+> **Superseded (post-v1):** hazard 3 / fix 4 above concerned the `palette` statement, which has since
+> been **removed**. Colours now carry a `#` sigil and resolve against the active theme — a `#hex` or CSS
+> name stays literal, while a theme token (`#sky`), a `#series<N>` ramp index, and a role (`#muted`) map
+> per theme; an unknown token throws `unknown colour` at build. See `docs/API.md` → *Colours* and CHANGELOG.
 
 ## Deferred (would help, but not now)
 

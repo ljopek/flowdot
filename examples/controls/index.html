@@ -19,28 +19,24 @@
     (0.5× / 1× / 2×). No authored JavaScript.</p>
 
   <!-- ↓ this IS the diagram. boot() inserts a <canvas>, then a transport bar (from the `controls` line). -->
-  <script type="text/flow" data-flowdot data-editable data-source="#src">
-diagram "Transport controls" 720x300 dark
-palette series = #5ef2a0 #5cb4ff
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Transport controls" 720x300
 
 # one line opts this diagram into the auto-rendered transport bar
 controls
 
-lane in
-lane mid
-lane out
-rail r0
+node src    lane:in  rail:r0 inspect:"<b>src</b> — packet source; use the transport controls below to pause or reset"
+node work  core lane:mid rail:r0 inspect:"<b>work</b> — processor (core/double-ring); try 0.5× speed to see each step"
+node sink   lane:out rail:r0 inspect:"<b>sink</b> — final destination; receives all processed packets"
 
-node src   box  lane:in  rail:r0 name:"Source" accent:series0
-node work  core lane:mid rail:r0 name:"Worker"
-node sink  box  lane:out rail:r0 name:"Sink"
-edge src.out  -> work.in alpha:0.35
-edge work.out -> sink.in alpha:0.35
+edge src  -> work alpha:0.35
+edge work -> sink alpha:0.35
 
 # a steady stream so Pause / Reset / speed changes are easy to see
-flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
+flow f rate:2 : src ~0.7 work ~0.7 sink
   </script>
 
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
   <div class="src-label">the .flow source — edit it and the diagram updates</div>
   <textarea class="src" id="src" spellcheck="false"></textarea>
 </div>
@@ -74,8 +70,22 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     bg:'#060910', panel:'#0f1724', panel2:'#0d131e', line:'#26374a',
     text:'#e8f0fb', muted:'#93a6bd', white:'#ffffff',
     hot:'#4d9bff', bad:'#ff5a7a', idle:'#3a4a63', dim:'#41536e', accent:'#ffd24a',
+    // matrix cell fills (empty / down / stroke) — themed so a light scheme recolours them too
+    cellBg:'#0e1c28', cellDown:'#2a1620', cellStroke:'#16222f',
+    // the asphalt track a road's coloured surface rides on — themed so a light scheme gets a light track
+    roadBed:'#0b131d',
     // domain palette (a diagram may override) — vivid so the roles stand out on the dark bg
-    series:['#5ef2a0','#5cb4ff','#c98cff']
+    series:['#5ef2a0','#5cb4ff','#c98cff'],
+    // named colour tokens (referenced as `#emerald` etc.) — MAP per theme; dark values == the hex the
+    // examples use today, so a token'd example renders as it did. Author-facing vocabulary; see resolveColor.
+    colors:{ emerald:'#5ef2a0', sky:'#5cb4ff', violet:'#c98cff', amber:'#f2cc60', rose:'#ff9db1',
+             mint:'#6ee7b7', lime:'#7ee787', azure:'#4f9dff', bronze:'#c98a4a' },
+    // default colour PER COMPONENT KIND (a role name resolved against the active theme) — so a diagram
+    // that names no colours still renders fully themed, and a per-kind override / theme swap flows in
+    // one place (see themeKindColor + the `colors <kind>:#tok` statement). Values == today's scattered
+    // fallbacks, so nothing recolours. matrix draws its columns from the `series` ramp; flow uses road.
+    kindColors:{ box:'line', core:'line', ring:'hot', matrix:'accent', pipeline:'accent',
+                 zone:'line', road:'hot', edge:'line', flow:'hot' }
   };
 
   // ─────────────────────────────────────────────────────────── named theme packs
@@ -92,13 +102,60 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     }
     return Object.assign({}, Theme, spec);                 // an explicit object overlays the default
   }
-  // Two shipped example themes (a light scheme and a navy/gold corporate brand).
-  registerTheme('light',     { bg:'#f4f6fb', panel:'#ffffff', panel2:'#eef2f8', line:'#c9d3e0', text:'#1a2230',
+  // One shipped example theme: a light scheme (register your own house style via registerTheme).
+  registerTheme('light',     { bg:'#f4f6fb', panel:'#ffffff', panel2:'#eef2f8', line:'#94a3b8', text:'#1a2230',
     muted:'#5b6b82', white:'#0b1119', hot:'#2563eb', bad:'#dc2626', idle:'#b7c2d4', dim:'#9fb0c6',
-    accent:'#b45309', series:['#0e9f6e','#2563eb','#7c3aed'] });
-  registerTheme('corporate', { bg:'#0b1e33', panel:'#12293f', panel2:'#0e2236', line:'#2a4a68', text:'#e6eefc',
-    muted:'#8fa9c8', white:'#ffffff', hot:'#4f9dff', bad:'#ff6b6b', idle:'#3a5674', dim:'#46617f',
-    accent:'#f4b942', series:['#4f9dff','#f4b942','#6ee7b7'] });
+    accent:'#b45309', cellBg:'#eef2f8', cellDown:'#fde2e4', cellStroke:'#d3dbe6', roadBed:'#d3dbe6',
+    series:['#0e9f6e','#2563eb','#7c3aed'],
+    colors:{ emerald:'#0e9f6e', sky:'#2563eb', violet:'#7c3aed', amber:'#b45309', rose:'#c81e5b',
+             mint:'#10b981', lime:'#3f9142', azure:'#1d4ed8', bronze:'#9a6a2e' } });
+
+  // ─────────────────────────────────────────────────────────── colour resolution (the `#` sigil)
+  // Every colour is written `#<something>` (D-C). resolveColor maps it against the ACTIVE theme so a
+  // token flips when the theme does, while hex + CSS names stay literal:
+  //   #rgb / #rrggbb        → literal hex (never maps — exact control)
+  //   #<theme token>        → theme.colors[name]  (emerald/sky/…  — MAPS per theme)
+  //   #<theme role>         → theme[name]         (text/muted/line/accent/hot/… — MAPS per theme)
+  //   #<css colour name>    → the bare name       (steelblue/lightblue/… — literal, canvas accepts it)
+  //   else                  → throw, listing the theme's tokens (a typo like #skyy is loud, not silent)
+  // A non-string or non-`#` value passes through unchanged (defensive; the parser enforces the sigil).
+  const NAMED_COLORS = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black ' +
+    'blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue ' +
+    'cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki ' +
+    'darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue ' +
+    'darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue ' +
+    'firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow ' +
+    'grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon ' +
+    'lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink ' +
+    'lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime ' +
+    'limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen ' +
+    'mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose ' +
+    'moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen ' +
+    'paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red ' +
+    'rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue ' +
+    'slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white ' +
+    'whitesmoke yellow yellowgreen transparent currentcolor').split(' '));
+  function resolveColor(value, theme) {
+    if (typeof value !== 'string' || value[0] !== '#') return value;   // not a `#…` colour → pass through
+    const body = value.slice(1), th = theme || Theme;
+    if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(body)) return value;  // #hex literal
+    if (th.colors && th.colors[body] != null) return th.colors[body];  // theme token → maps
+    const sm = /^series(\d+)$/.exec(body);                             // #series0/1/2 → the theme's ramp (maps; for `each` loops)
+    if (sm && Array.isArray(th.series) && th.series[+sm[1]] != null) return th.series[+sm[1]];
+    if (typeof th[body] === 'string') return th[body];                 // theme role → maps
+    if (NAMED_COLORS.has(body.toLowerCase())) return body;             // CSS name → literal
+    throw new Error('flowdot: unknown colour "' + value + '" — use #hex, a theme token (' +
+      Object.keys(th.colors || {}).join(', ') + '), a role, or a CSS colour name');
+  }
+  // The default colour for a component KIND under a theme: a per-kind override (env.kindColors, set by a
+  // `colors <kind>:#tok` statement) wins; else the theme's kindColors role; else the neutral line role.
+  // Total: any kind (even unlisted) resolves to a themed colour, never undefined.
+  function themeKindColor(theme, kind, overrides) {
+    const th = theme || Theme;
+    if (overrides && overrides[kind] != null) return resolveColor(overrides[kind], th);
+    const role = (th.kindColors && th.kindColors[kind]) || 'line';
+    return th[role] || th.line;
+  }
 
   // ─────────────────────────────────────────────────────────── Rng (seedable, pure)
   // mulberry32 — a tiny deterministic PRNG. A fixed seed makes an animation reproducible
@@ -146,6 +203,10 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     glow(g,x,y,r,color,a){ g.save(); g.globalCompositeOperation='lighter';
       g.shadowColor=color; g.shadowBlur=r*2.6; g.globalAlpha=a==null?1:a; g.fillStyle=color;
       g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); },
+    // a solid dot with a soft shadow — same footprint as glow() but NORMAL compositing, for light
+    // backgrounds where additive 'lighter' washes the colour toward white (an invisible dot).
+    dot(g,x,y,r,color,a){ g.save(); g.shadowColor=color; g.shadowBlur=r*1.8; g.globalAlpha=a==null?1:a;
+      g.fillStyle=color; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); },
     link(g,x1,y1,x2,y2,o){ o=o||{}; g.save(); g.globalAlpha=o.alpha==null?1:o.alpha;
       g.strokeStyle=o.c||Theme.line; g.lineWidth=o.lw||1.3; if(o.dash) g.setLineDash(o.dash);
       g.beginPath(); g.moveTo(x1,y1); g.bezierCurveTo((x1+x2)/2,y1,(x1+x2)/2,y2,x2,y2); g.stroke(); g.restore(); }
@@ -179,10 +240,11 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // ─────────────────────────────────────────────────────────── Box
   class Box extends Component {
     constructor(id, spec){ super(id, spec);
-      this.name=spec.name||id; this.sub=spec.sub||null; this.accent=spec.accent||Theme.line; }
+      this.name=spec.name||id; this.sub=spec.sub||null; this.accent=spec.accent||null; }  // null → theme default at draw
     draw(g, env){
-      Draw.box(g,this.x,this.y,this.w,this.h,{stroke:this.accent, glow:this.hovered?env.theme.hot:null});
-      Draw.text(g,this.name,this.x+this.w/2,this.y+this.h/2+(this.sub?-2:5),{c:this.accent===Theme.line?env.theme.text:this.accent,size:13,align:'center',w:'600'});
+      const kc=themeKindColor(env.theme,'box',env.kindColors);
+      Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel, stroke:this.accent||kc, glow:this.hovered?env.theme.hot:null});
+      Draw.text(g,this.name,this.x+this.w/2,this.y+this.h/2+(this.sub?-2:5),{c:this.accent||env.theme.text,size:13,align:'center',w:'600'});
       if(this.sub) Draw.text(g,this.sub,this.x+this.w/2,this.y+this.h/2+14,{c:env.theme.muted,size:10.5,align:'center'});
     }
   }
@@ -190,11 +252,11 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // ─────────────────────────────────────────────────────────── Core (pinned, double border)
   class Core extends Box {
     constructor(id, spec){ super(id, spec); this.lit=spec.lit!==false; }
-    draw(g, env){
-      Draw.box(g,this.x,this.y,this.w,this.h,{fill:Theme.panel2,stroke:Theme.line,r:9,glow:this.hovered?env.theme.hot:null});
-      g.save(); g.strokeStyle=this.lit?this.accent:Theme.idle; g.globalAlpha=this.lit?0.9:0.5; g.lineWidth=1.4;
+    draw(g, env){ const accent=this.accent||themeKindColor(env.theme,'core',env.kindColors);
+      Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel2,stroke:env.theme.line,r:9,glow:this.hovered?env.theme.hot:null});
+      g.save(); g.strokeStyle=this.lit?accent:env.theme.idle; g.globalAlpha=this.lit?0.9:0.5; g.lineWidth=1.4;
       Draw.roundRect(g,this.x+3,this.y+3,this.w-6,this.h-6,7); g.stroke(); g.restore();
-      Draw.text(g,this.name,this.x+this.w/2,this.y+this.h/2+4,{c:this.hovered?env.theme.white:this.accent,align:'center',w:'600'});
+      Draw.text(g,this.name,this.x+this.w/2,this.y+this.h/2+4,{c:this.hovered?env.theme.white:accent,align:'center',w:'600'});
     }
   }
 
@@ -202,7 +264,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // State + logic is testable (push/drain/surge/lapping); draw renders slots + write cursor.
   class RingBuffer extends Component {
     constructor(id, spec){ super(id, spec);
-      this.slots=spec.slots||12; this.r=spec.r||16; this.color=spec.color||Theme.hot;
+      this.slots=spec.slots||12; this.r=spec.r||16; this.color=spec.color||null;  // null → theme.hot at draw
       this.label=spec.label||null;      // e.g. the provider this lane carries
       // Optional, self-reserving box: a ring drawn with no explicit w/h sizes its box to hold the
       // circle AND its side label (see _labelW / bounds), so auto-placed rings never intersect.
@@ -231,7 +293,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       if(name==='center') return [this._cx(), cy];
       return super.port(name); }
     draw(g, env){
-      const cx=this._cx(), cy=this.y+this.h/2, col=this.lapping?env.theme.bad:this.color;
+      const color=this.color||themeKindColor(env.theme,'ring',env.kindColors), cx=this._cx(), cy=this.y+this.h/2, col=this.lapping?env.theme.bad:color;
       g.save(); g.strokeStyle=this.lapping?'rgba(239,71,111,0.55)':'rgba(130,150,180,0.32)'; g.lineWidth=1.4;
       g.beginPath(); g.arc(cx,cy,this.r,0,7); g.stroke(); g.restore();
       const filled=Math.round((this.fill/this.slots)*this.slots);
@@ -242,7 +304,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       const wa=((this.write%this.slots)/this.slots)*2*Math.PI-Math.PI/2;
       g.save(); g.strokeStyle=env.theme.white; g.lineWidth=1.7;
       g.beginPath(); g.arc(cx+Math.cos(wa)*this.r, cy+Math.sin(wa)*this.r,4,0,7); g.stroke(); g.restore();
-      if(this.label) Draw.text(g,this.label,cx+this.r+8,cy+3,{c:this.color,size:10.5});
+      if(this.label) Draw.text(g,this.label,cx+this.r+8,cy+3,{c:color,size:10.5});
     }
   }
 
@@ -250,7 +312,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   class Matrix extends Component {
     constructor(id, spec){ super(id, spec);
       this.rows=spec.rows; this.cols=spec.cols; this.cw=spec.cw||76; this.ch=spec.ch||56; this.gap=spec.gap||4;
-      this.colColors=spec.colColors||Theme.series; this.rowLabels=spec.rowLabels||[]; this.colLabels=spec.colLabels||[];
+      this.colColors=spec.colColors||null; this.rowLabels=spec.rowLabels||[]; this.colLabels=spec.colLabels||[];  // null → theme.series at draw
       this.title=spec.title||'Matrix'; this.subtitle=spec.subtitle||''; this.cellNote=spec.cellNote||null;
       this.w=this.cols*(this.cw+this.gap)-this.gap; this.h=this.rows*(this.ch+this.gap)-this.gap;
       this.cells=[]; for(let i=0;i<this.rows;i++){ const r=[];
@@ -274,18 +336,18 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       if(p[0]==='colTop'){ const j=+p[1]; return [this.colX(j)+this.cw/2, this.y-6]; }
       return super.port(name);
     }
-    draw(g, env){
+    draw(g, env){ const colColors=this.colColors||env.theme.series;
       Draw.text(g,this.title,this.x,this.y-24,{c:this.hovered?env.theme.white:env.theme.text,size:13,w:'600'});
       if(this.subtitle) Draw.text(g,this.subtitle,this.x+42,this.y-24,{c:env.theme.muted,size:10});
-      for(let j=0;j<this.cols;j++){ const c=this.cells[0][j].down?env.theme.bad:this.colColors[j];
+      for(let j=0;j<this.cols;j++){ const c=this.cells[0][j].down?env.theme.bad:colColors[j];
         g.fillStyle=c; g.fillRect(this.colX(j),this.y-8,this.cw,3);
         if(this.colLabels[j]) Draw.text(g,this.colLabels[j],this.colX(j)+this.cw/2,this.y-12,{c,size:10.5,align:'center'}); }
       for(let i=0;i<this.rows;i++) if(this.rowLabels[i])
         Draw.text(g,this.rowLabels[i],this.x-8,this.rowY(i)+this.ch/2+3,{c:env.theme.text,size:11,align:'right'});
       for(let i=0;i<this.rows;i++)for(let j=0;j<this.cols;j++){
-        const x=this.colX(j), y=this.rowY(i), c=this.cells[i][j], f=c.fresh, col=this.colColors[j];
-        const fill=c.down?'#2a1620':(f>0?Tween.mix('#0e1c28',col,f):'#0e1c28');
-        Draw.box(g,x,y,this.cw,this.ch,{fill,stroke:'#16222f',glow:f>0.4?col:null,r:6});
+        const x=this.colX(j), y=this.rowY(i), c=this.cells[i][j], f=c.fresh, col=colColors[j];
+        const fill=c.down?env.theme.cellDown:(f>0?Tween.mix(env.theme.cellBg,col,f):env.theme.cellBg);
+        Draw.box(g,x,y,this.cw,this.ch,{fill,stroke:env.theme.cellStroke,glow:f>0.4?col:null,r:6});
         if(this.cellNote){ const note=this.cellNote(i,j); if(note) Draw.text(g,note,x+6,y+13,{c:env.theme.muted,size:8.5}); }
         if(c.down) Draw.text(g,'DOWN',x+this.cw/2,y+34,{c:env.theme.bad,size:9,align:'center',w:'600'});
         else if(f>0.05 && c.value!=null){ Draw.text(g,c.value,x+this.cw/2,y+33,{c:env.theme.text,size:10,align:'center'});
@@ -303,9 +365,12 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // container — so the same component renders either a horizontal chain or a vertical step-stack.
   class Pipeline extends Component {
     constructor(id, spec){ super(id, spec);
-      this.stages=spec.stages||['a','b']; this.nodeR=spec.nodeR||15; this.idle=!!spec.idle;
+      this.stages=spec.stages||['a','b'];
+      // vertical stacks default to a SMALL stage radius so 3 stages fit a normal box without the
+      // circles overlapping (step 24 − 2·8 = 8px gap); horizontal chains keep the larger 15.
+      this.nodeR=spec.nodeR!=null?spec.nodeR:(spec.vertical?8:15); this.idle=!!spec.idle;
       this.vertical=!!spec.vertical; this.boxed=!!spec.boxed; this.pinned=!!spec.pinned;
-      this.name=spec.name||null; this.accent=spec.accent||Theme.accent;
+      this.name=spec.name||null; this.accent=spec.accent||null;  // null → theme.accent at draw
       this.pad=spec.pad!=null?spec.pad:(this.vertical?36:118);
       this.step=spec.step!=null?spec.step:(this.vertical?24:70);
       this.pulseAt=-1; }
@@ -318,10 +383,10 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       if(name==='out') return [this.nodeX(this.stages.length-1), this.nodeY(0)];
       const m=/^stage:(\d+)$/.exec(name); if(m) return [this.nodeX(+m[1]), this.nodeY(0)];
       return super.port(name); }
-    draw(g, env){ const th=env.theme;
-      if(this.boxed){ Draw.box(g,this.x,this.y,this.w,this.h,{fill:this.pinned?th.panel2:th.panel,stroke:this.accent,glow:this.hovered?th.hot:null,r:9});
-        if(this.pinned){ g.save(); g.strokeStyle=this.accent; g.globalAlpha=0.5; g.lineWidth=1.2; Draw.roundRect(g,this.x+3,this.y+3,this.w-6,this.h-6,7); g.stroke(); g.restore(); }
-        if(this.name) Draw.text(g,this.name,this.x+11,this.y+18,{c:this.hovered?th.white:this.accent,size:12,w:'600'}); }
+    draw(g, env){ const th=env.theme, accent=this.accent||themeKindColor(th,'pipeline',env.kindColors);
+      if(this.boxed){ Draw.box(g,this.x,this.y,this.w,this.h,{fill:this.pinned?th.panel2:th.panel,stroke:accent,glow:this.hovered?th.hot:null,r:9});
+        if(this.pinned){ g.save(); g.strokeStyle=accent; g.globalAlpha=0.5; g.lineWidth=1.2; Draw.roundRect(g,this.x+3,this.y+3,this.w-6,this.h-6,7); g.stroke(); g.restore(); }
+        if(this.name) Draw.text(g,this.name,this.x+11,this.y+18,{c:this.hovered?th.white:accent,size:12,w:'600'}); }
       const active=this.pulseAt>=0 && env.now-this.pulseAt<0.5;
       for(let k=0;k<this.stages.length;k++){ const nx=this.nodeX(k), ny=this.nodeY(k), lit=active && (env.now-this.pulseAt)*8>k;
         if(k<this.stages.length-1){ const nx2=this.nodeX(k+1), ny2=this.nodeY(k+1);
@@ -329,7 +394,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           if(this.vertical){ g.moveTo(nx,ny+this.nodeR+1); g.lineTo(nx2,ny2-this.nodeR-1); }
           else { g.moveTo(nx+this.nodeR+1,ny); g.lineTo(nx2-this.nodeR-1,ny); }
           g.stroke(); g.restore(); }
-        const col=this.idle?th.idle:(k===0?this.accent:(k===this.stages.length-1?th.hot:th.text));
+        const col=this.idle?th.idle:(k===0?accent:(k===this.stages.length-1?th.hot:th.text));
         g.save(); if(lit){ g.shadowColor=col; g.shadowBlur=14; } g.fillStyle=th.panel2;
         g.strokeStyle=lit?col:(this.idle?th.idle:th.line); g.lineWidth=lit?2:1.2;
         g.beginPath(); g.arc(nx,ny,this.nodeR,0,7); g.fill(); g.stroke(); g.restore();
@@ -342,10 +407,10 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   class Zone extends Component {
     constructor(id, spec){ super(id, spec);
       this.label=spec.label||''; this.tint=spec.tint||'rgba(120,150,190,0.035)';
-      this.accent=spec.accent||Theme.line; this.hoverable=false; }
+      this.accent=spec.accent||null; this.hoverable=false; }  // null → theme.line at draw
     draw(g, env){ const th=env.theme;
       g.save(); g.fillStyle=this.tint; Draw.roundRect(g,this.x,this.y,this.w,this.h,12); g.fill();
-      g.globalAlpha=0.55; g.strokeStyle=this.accent; g.lineWidth=1.2; g.setLineDash([5,4]);
+      g.globalAlpha=0.55; g.strokeStyle=this.accent||themeKindColor(th,'zone',env.kindColors); g.lineWidth=1.2; g.setLineDash([5,4]);
       Draw.roundRect(g,this.x,this.y,this.w,this.h,12); g.stroke(); g.restore();
       if(this.label) Draw.text(g,this.label,this.x+14,this.y+19,{c:th.muted,size:12,w:'600'}); }
   }
@@ -355,7 +420,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // cars on a road. Thin Connectors stay for in-process edges.
   class Channel extends Component {
     constructor(id, spec){ super(id, spec); this.from=spec.from; this.to=spec.to;
-      this.roadW=spec.roadW||16; this.color=spec.color||Theme.hot; this.label=spec.label||null;
+      this.roadW=spec.roadW||spec.width||16; this.color=spec.color||null; this.label=spec.label||null;  // `.flow` authors write width:; roadW is the IR name. null color → theme default at draw
       this.hoverable=spec.hoverable!==false; }
     _pt(ref){ if(typeof ref==='function') return ref();
       if(ref.length===2 && typeof ref[0]==='number') return ref; return ref[0].port(ref[1]); }
@@ -363,11 +428,11 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       g.beginPath(); g.moveTo(a[0],a[1]); g.bezierCurveTo((a[0]+b[0])/2,a[1],(a[0]+b[0])/2,b[1],b[0],b[1]); return [a,b]; }
     contains(mx,my){ const a=this._pt(this.from), b=this._pt(this.to), r=this.roadW/2+4;
       return mx>=Math.min(a[0],b[0])-r && mx<=Math.max(a[0],b[0])+r && my>=Math.min(a[1],b[1])-r && my<=Math.max(a[1],b[1])+r; }
-    draw(g, env){ const th=env.theme;
+    draw(g, env){ const th=env.theme, color=this.color||themeKindColor(th,'road',env.kindColors);
       g.save(); g.lineCap='round';
-      this._path(g); g.strokeStyle='#0b131d'; g.lineWidth=this.roadW; g.stroke();                         // road bed
-      this._path(g); g.strokeStyle=this.color; g.globalAlpha=this.hovered?0.30:0.16; g.lineWidth=this.roadW-3; g.stroke(); // surface
-      this._path(g); g.strokeStyle=this.color; g.globalAlpha=0.8; g.lineWidth=1.4;                        // moving lane markings
+      this._path(g); g.strokeStyle=th.roadBed; g.lineWidth=this.roadW; g.stroke();                         // road bed (asphalt track, themed — light in a light scheme)
+      this._path(g); g.strokeStyle=color; g.globalAlpha=this.hovered?0.30:0.16; g.lineWidth=Math.max(1,this.roadW-3); g.stroke(); // surface (guard: a thin road never yields a 0/negative stroke)
+      this._path(g); g.strokeStyle=color; g.globalAlpha=0.8; g.lineWidth=1.4;                        // moving lane markings
       g.setLineDash([5,9]); g.lineDashOffset=-(env.now*36)%14; g.stroke(); g.setLineDash([]);
       g.restore();
       if(this.label){ const a=this._pt(this.from), b=this._pt(this.to);
@@ -383,10 +448,34 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       if(ref.length===2 && typeof ref[0]==='number') return ref;
       return ref[0].port(ref[1]); }
     draw(g, env){ const a=this._pt(this.from), b=this._pt(this.to);
-      Draw.link(g,a[0],a[1],b[0],b[1],{c:this.opts.c||env.theme.line, alpha:this.opts.alpha==null?0.18:this.opts.alpha, dash:this.opts.dash});
+      const dash=this.opts.dash||(this.opts.dashed?[5,4]:null);   // `dashed` flag → a default dash (async/lossy edge)
+      Draw.link(g,a[0],a[1],b[0],b[1],{c:this.opts.c||themeKindColor(env.theme,'edge',env.kindColors), alpha:this.opts.alpha==null?0.18:this.opts.alpha, dash});
+      if(this.opts.label){                                        // a documentation label on a chip at the edge midpoint
+        const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+        g.save(); g.font='10px ui-monospace,monospace'; const tw=g.measureText(this.opts.label).width;
+        g.globalAlpha=0.9; g.fillStyle=env.theme.panel; Draw.roundRect(g,mx-tw/2-5,my-14,tw+10,16,4); g.fill(); g.globalAlpha=1;
+        Draw.text(g,this.opts.label,mx,my-3,{c:env.theme.muted,size:10,align:'center'}); g.restore(); }
       if(this.pulseAt>=0 && env.now-this.pulseAt<0.45){ const t=Tween.ease((env.now-this.pulseAt)/0.45);
         const p=Tween.lerpPt(a,b,t); Draw.glow(g,p[0],p[1],3.4,this.opts.pulseColor||env.theme.accent); } }
   }
+
+  // A documentation callout: a text chip floated above a target component, tied to it by a leader line.
+  class Note {
+    constructor(ref, text){ this.ref=ref; this.text=text; }
+    draw(g, env){ const top=this.ref.port('top'); const nx=top[0], ny=top[1], ty=ny-32;
+      g.save(); g.font='10px ui-monospace,monospace'; const tw=g.measureText(this.text).width;
+      g.strokeStyle=env.theme.muted; g.globalAlpha=0.55; g.setLineDash([2,3]); g.lineWidth=1;   // leader line
+      g.beginPath(); g.moveTo(nx,ny); g.lineTo(nx,ty+9); g.stroke(); g.setLineDash([]); g.globalAlpha=1;
+      g.fillStyle=env.theme.panel2; Draw.roundRect(g,nx-tw/2-6,ty-9,tw+12,18,5); g.fill();          // chip
+      g.strokeStyle=env.theme.line; g.lineWidth=1; Draw.roundRect(g,nx-tw/2-6,ty-9,tw+12,18,5); g.stroke();
+      Draw.text(g,this.text,nx,ty+4,{c:env.theme.text,size:10,align:'center'}); g.restore(); }
+  }
+
+  // Relative luminance (WCAG) of a #rrggbb — used to detect a light theme background so the flow dot
+  // renders solid instead of additively (which would wash it out to white on a light bg).
+  function relLum(hex){ const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return 0;
+    const n=parseInt(m[1],16), lin=c=>{c/=255; return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);};
+    return 0.2126*lin(n>>16&255)+0.7152*lin(n>>8&255)+0.0722*lin(n&255); }
 
   // ─────────────────────────────────────────────────────────── FlowSystem (packets on routes)
   // A leg: { from, to, dur, style?, onArrive? }.  from/to are port refs (see Connector._pt).
@@ -404,8 +493,9 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     _pt(ref){ if(typeof ref==='function') return ref();
       if(ref.length===2 && typeof ref[0]==='number') return ref; return ref[0].port(ref[1]); }
     pos(p){ const leg=p.route[p.i]; return Tween.lerpPt(this._pt(leg.from), this._pt(leg.to), Tween.ease(p.t)); }
-    draw(g){ for(const p of this.packets){ const leg=p.route[p.i]; const st=leg.style||p.style;
-      const q=this.pos(p); Draw.glow(g,q[0],q[1],st.r||3.4,st.color); } }
+    draw(g,env){ const light=env&&env.theme&&relLum(env.theme.bg)>0.5;   // solid dot on a light bg (glow washes out)
+      for(const p of this.packets){ const leg=p.route[p.i]; const st=leg.style||p.style;
+      const q=this.pos(p); (light?Draw.dot:Draw.glow)(g,q[0],q[1],st.r||3.4,st.color); } }
   }
 
   // ─────────────────────────────────────────────────────────── FlowRuntime (temporal control)
@@ -474,12 +564,14 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       this.cv=canvas; this.g=canvas.getContext('2d');
       this.W=spec.width||1380; this.H=spec.height||820;
       this.theme=resolveTheme(spec.theme);                 // string name (registry) | object | undefined
-      // paint a named non-default theme's background (so `theme corporate/light` visibly re-skins);
+      this.kindColors=spec.kindColors||null;               // per-kind colour override (raw #tokens; see themeKindColor)
+      // paint a named non-default theme's background (so `theme light` visibly re-skins);
       // the default/dark theme keeps the transparent clear so existing pages are pixel-identical.
       this._themeBg=(typeof spec.theme==='string' && spec.theme!=='dark') ? this.theme.bg : null;
       this.DPR=Math.min(2, (global.devicePixelRatio||1));
       this.cv.width=this.W*this.DPR; this.cv.height=this.H*this.DPR; this.cv.style.aspectRatio=this.W+' / '+this.H;
       this.components=[]; this.connectors=[]; this.zones=[]; this.roads=[]; this.flow=new FlowSystem(); this.overlays=[];
+      this.annotations=[]; this.legend=null;                 // note callouts + an opt-in colour key
       this.title=spec.title||null; this.subtitle=spec.subtitle||null; this.background=spec.background||null;
       this.onUpdate=spec.onUpdate||null;
       this.now=0; this.paused=false; this.speed=1; this._hover=null; this._lastT=0;
@@ -490,10 +582,11 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     addZone(z){ this.zones.push(z); return z; }
     addRoad(r){ this.roads.push(r); return r; }
     connector(from,to,opts){ const c=new Connector(from,to,opts); this.connectors.push(c); return c; }
+    note(ref,text){ const n=new Note(ref,text); this.annotations.push(n); return n; }
     overlay(fn){ this.overlays.push(fn); return this; }
     inspector(el, defaultHTML){ this._insEl=el; this._insDefault=defaultHTML||''; this._setIns(null); return this; }
     setPaused(b){ this.paused=b; } setSpeed(s){ this.speed=s; }
-    env(){ return {now:this.now, dt:this._dt||0, theme:this.theme, flow:this.flow, diagram:this}; }
+    env(){ return {now:this.now, dt:this._dt||0, theme:this.theme, kindColors:this.kindColors, flow:this.flow, diagram:this}; }
 
     _bindMouse(){
       // Stored as fields so dispose() can removeEventListener them (no leaked listeners on re-mount).
@@ -541,8 +634,20 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       for(const c of this.connectors) c.draw(g,env);
       for(const c of this.components) c.draw(g,env);
       this.flow.draw(g,env);
+      for(const n of this.annotations) n.draw(g,env);              // callouts + legend float on top
+      if(this.legend && this.legend.length) this._drawLegend(g,env);
       for(const o of this.overlays) o(g,env);
     }
+    _drawLegend(g,env){ const items=this.legend; g.save(); g.font='10px ui-monospace,monospace';
+      const rowH=17, pad=8, sw=12;
+      const w=Math.max(...items.map(e=>g.measureText(e.label).width))+sw+pad*2+8;
+      const h=items.length*rowH+pad*2-2, x=this.W-w-14, y=14;
+      g.globalAlpha=0.94; g.fillStyle=env.theme.panel2; Draw.roundRect(g,x,y,w,h,6); g.fill(); g.globalAlpha=1;
+      g.strokeStyle=env.theme.line; g.lineWidth=1; Draw.roundRect(g,x,y,w,h,6); g.stroke();
+      items.forEach((e,i)=>{ const ry=y+pad+i*rowH;
+        g.fillStyle=e.color; Draw.roundRect(g,x+pad,ry+1,sw,sw,3); g.fill();
+        Draw.text(g,e.label,x+pad+sw+8,ry+sw-2,{c:env.theme.text,size:10}); });
+      g.restore(); }
   }
 
   // ─────────────────────────────────────────────────────────── StateStore (declarative behaviour)
@@ -582,7 +687,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     } }
   }
 
-  const API = { Theme, Themes, registerTheme, resolveTheme, Rng, Tween, Draw, Component, Box, Core, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, FlowSystem, FlowRuntime, StateStore, Diagram };
+  const API = { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, FlowSystem, FlowRuntime, StateStore, Diagram };
   if (typeof module!=='undefined' && module.exports) module.exports = API;
   /* node:coverage disable */                         // browser UMD tail (window.Flowdot) — unreachable under node
   else global.Flowdot = API;
@@ -661,14 +766,21 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // a lane, y on a rail, or x/y on a node always wins, so mixed (some placed, some auto) diagrams and
   // every existing .flow file are unaffected.
   const LAYOUT_PAD = 24, LAYOUT_GAP = 24;
+  // Default slot size used when no `diagram WxH` is declared but lanes/rails exist.
+  const AUTO_SLOT_W = 200, AUTO_BAND_H = 120;
 
   // Fill in any lane x/w and rail y that the author omitted, by evenly distributing tracks across the
   // diagram's width/height. `lane l` / `lane r` become two columns splitting the width; `rail row`
   // becomes a single centred row. Returns fresh lane/rail arrays (pure — never mutates the IR).
+  // Also returns effective W/H: when ir.width/ir.height is null but tracks exist, W/H are derived from
+  // the track count so nodes distribute correctly even without an explicit `diagram WxH` statement.
   function autofillTracks(ir) {
-    const W = ir.width, H = ir.height;
     const lanes = (ir.lanes || []).map(l => Object.assign({}, l));
     const rails = (ir.rails || []).map(r => Object.assign({}, r));
+    const W = ir.width != null ? ir.width
+            : lanes.length ? 2*LAYOUT_PAD + lanes.length*AUTO_SLOT_W + (lanes.length-1)*LAYOUT_GAP : null;
+    const H = ir.height != null ? ir.height
+            : rails.length ? 2*LAYOUT_PAD + rails.length*AUTO_BAND_H : null;
     if (lanes.length && W != null) {                            // columns: split width into N slots
       const slot = (W - 2 * LAYOUT_PAD - (lanes.length - 1) * LAYOUT_GAP) / lanes.length;
       lanes.forEach((L, i) => {
@@ -680,7 +792,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       const band = (H - 2 * LAYOUT_PAD) / rails.length;
       rails.forEach((R, i) => { if (R.y == null) R.y = LAYOUT_PAD + (i + 0.5) * band; });
     }
-    return { lanes, rails };
+    return { lanes, rails, W, H };
   }
 
   // Resolve relative placement into concrete x/y/w and fill in default dimensions. A node may carry
@@ -703,7 +815,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   function resolveLayout(ir) {
     const tracks = autofillTracks(ir);
     const lanes = indexById(tracks.lanes), rails = indexById(tracks.rails);
-    const H = ir.height, W = ir.width;
+    const H = tracks.H, W = tracks.W;
     // Group the nodes that auto-place: stacks = down a lane (no rail, no y); spreads = across a rail
     // (no lane, no x). The two are transposes of each other; declaration order fixes the position.
     const stacks = {}, spreads = {};
@@ -761,7 +873,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   const ZONE_TOP = 56;                                            // content top: clears the title/subtitle
   function resolveZones(ir) {
     const tracks = autofillTracks(ir);
-    const lanes = indexById(tracks.lanes), rails = indexById(tracks.rails), H = ir.height;
+    const lanes = indexById(tracks.lanes), rails = indexById(tracks.rails), H = tracks.H;
     const list = (v) => v == null ? null : (Array.isArray(v) ? v : [v]);
     return (ir.zones || []).map(z => {
       const o = Object.assign({}, z);
@@ -802,27 +914,72 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // needs (the CLI, the harness, the golden guard, dry-validation, tests) — build() defaults to it.
   function recorder() {
     return {
-      components: [], zones: [], roads: [], connectors: [], flow: new DK.FlowSystem(), now: 0,
+      components: [], zones: [], roads: [], connectors: [], annotations: [], legend: null, flow: new DK.FlowSystem(), now: 0,
       add(c) { this.components.push(c); return c; },
       addZone(z) { this.zones.push(z); return z; },
       addRoad(r) { this.roads.push(r); return r; },
       connector(from, to, opts) { const c = new DK.Connector(from, to, opts); this.connectors.push(c); return c; },
+      note(ref, text) { const n = { ref, text }; this.annotations.push(n); return n; },
     };
+  }
+
+  // Auto-declare tracks: a node (or a zone) may reference a `lane:`/`rail:` that was never declared with
+  // a `lane`/`rail` line — create it on the fly, ordered by FIRST APPEARANCE among the nodes (then zones).
+  // Explicitly declared tracks keep their declared order + coordinates (they stay first); referenced-only
+  // ids are appended. So a fully implicit diagram gets first-appearance order, and an author writes a
+  // `lane`/`rail` line only to override the order or attach x/w/y — mirroring "coordinates are optional".
+  // Mutates ir.lanes/ir.rails in place (idempotent — a re-build creates nothing new) and returns warnings.
+  function autoDeclareTracks(ir) {
+    const warnings = [];
+    ['lane', 'rail'].forEach(kind => {
+      const listKey = kind + 's';                                       // 'lanes' | 'rails'
+      const seen = new Set((ir[listKey] || []).map(t => t.id));
+      const created = [];
+      const note = id => { if (id != null && !seen.has(id)) { seen.add(id); created.push(id); } };
+      (ir.nodes || []).forEach(n => note(n[kind]));                     // nodes first (declaration order)
+      (ir.zones || []).forEach(z => [].concat(                          // then any zone that spans a track
+        z[kind] != null ? z[kind] : [], z[listKey] != null ? z[listKey] : []).forEach(note));
+      if (!created.length) return;
+      ir[listKey] = (ir[listKey] || []).concat(created.map(id => ({ id })));
+      // Columns (lanes) track left→right declaration order reliably; ROWS inferred from node-declaration
+      // order can mis-place (an author may declare nodes in flow order, not top→bottom). So only rails
+      // warn, and only when 2+ are inferred (order matters). Informational — not fatal.
+      if (kind === 'rail' && created.length >= 2)
+        warnings.push('scene: inferred rail (row) order top→bottom = [' + created.join(', ') +
+          '] from first use; add explicit `rail <id>` lines to control it if that order is wrong.');
+    });
+    return warnings;
   }
 
   // Build IR into a diagram-like target (a Diagram, or the default headless recorder()).
   // Returns { diagram, byId, edgesById }. Edges carrying an `id` are indexed in edgesById.
+  // Resolve every colour attribute on a spec against the ACTIVE theme (Flowdot.resolveColor): a `#token`
+  // or `#role` maps per theme, `#hex`/`#css-name` stay literal. Mutates + returns the spec; resolveColor
+  // is idempotent (a resolved #hex re-resolves to itself), so a re-build (theme toggle) is safe — and
+  // because the toggle re-mounts, build-time resolution is enough to flip dark↔light.
+  const COLOR_ATTRS = ['accent', 'color', 'tint', 'pulseColor', 'c', 'fill', 'stroke', 'glow'];
+  function resolveColors(spec, theme) {
+    if (!spec) return spec;
+    for (const k of COLOR_ATTRS) if (typeof spec[k] === 'string') spec[k] = DK.resolveColor(spec[k], theme);
+    if (Array.isArray(spec.colColors)) spec.colColors = spec.colColors.map(c => DK.resolveColor(c, theme));
+    return spec;
+  }
+
   function build(ir, target) {
     if (!ir) throw new Error('scene.build: missing IR');
     const diagram = target || recorder();
+    const theme = (diagram && diagram.theme) || DK.Theme;               // resolve #tokens against it
+    if (ir.kindColors && diagram) diagram.kindColors = ir.kindColors;   // per-kind override (raw #tokens; themeKindColor resolves per active theme)
     const byId = {}, edgesById = {};
+    const warnings = autoDeclareTracks(ir);                             // create referenced-but-undeclared lanes/rails
+    if (warnings.length) ir.warnings = (ir.warnings || []).concat(warnings);
 
-    resolveZones(ir).forEach(z => diagram.addZone(new DK.Zone(z.id, z)));
+    resolveZones(ir).forEach(z => diagram.addZone(new DK.Zone(z.id, resolveColors(z, theme))));
 
     resolveLayout(ir).forEach(n => {
       const factory = KINDS[n.kind];
       if (!factory) throw new Error('scene.build: unknown kind "' + n.kind + '" for node "' + n.id + '"');
-      const c = factory(n.id, n);
+      const c = factory(n.id, resolveColors(n, theme));
       if (byId[n.id]) throw new Error('scene.build: duplicate node id "' + n.id + '"');
       byId[n.id] = c;
       diagram.add(c);
@@ -832,10 +989,18 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     (ir.edges || []).forEach(e => {
       const from = resolve(e.from), to = resolve(e.to);
       const handle = (e.kind === 'road')
-        ? diagram.addRoad(new DK.Channel(e.id, Object.assign({}, e, { from, to })))
-        : diagram.connector(from, to, e.style || {});
+        ? diagram.addRoad(new DK.Channel(e.id, resolveColors(Object.assign({}, e, { from, to }), theme)))
+        : diagram.connector(from, to, resolveColors(e.style || {}, theme));
       if (e.id) edgesById[e.id] = handle;
     });
+
+    (ir.notes || []).forEach(n => {                                     // callouts point at a built node
+      const c = byId[n.target];
+      if (!c) throw new Error('scene.build: note references unknown node "' + n.target + '"');
+      diagram.note(c, n.text);
+    });
+    if (ir.legend && ir.legend.length)                                  // resolve each swatch #token per theme
+      diagram.legend = ir.legend.map(e => ({ label: e.label, color: DK.resolveColor(e.color, theme) }));
 
     return { diagram, byId, edgesById };
   }
@@ -846,6 +1011,36 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   // fans a packet out to every option, both off the last route node.
   // ctx: { byId, diagram, rng? } where diagram exposes `.flow` (a FlowSystem) and `.now`; rng is an
   // optional ()=>[0,1) used for weighted picks (defaults to Math.random).
+  // Auto-derive faint connectors (opt-in via `auto-edges`): every flow route hop — including `|` pick
+  // and `&` fan-out branches (off the last route node) — gets a faint static Connector when no explicit
+  // `edge`/`road` already joins that node pair. It is the "road" the moving dots ride, so the author
+  // drops the duplicated `edge a -> b` lines. Templated hops (`worker{f}`, resolved per-fire) are skipped
+  // — they have no single node at build time. An explicit edge wins (its style stays); deduped across flows.
+  function deriveEdges(ir, ctx) {
+    if (!ir.autoEdges || !ir.flows) return;
+    const plain = id => id != null && String(id).indexOf('{') < 0;      // skip runtime-templated ids
+    const seen = new Set();
+    (ir.edges || []).forEach(e => {                                     // explicit edges/roads win → pre-seed
+      if (e.from && e.to && typeof e.from[0] === 'string' && typeof e.to[0] === 'string')
+        seen.add(e.from[0] + ' ' + e.to[0]);
+    });
+    const link = (from, to) => {
+      if (!plain(from.node) || !plain(to.node)) return;
+      const key = from.node + ' ' + to.node;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const a = ctx.byId[from.node], b = ctx.byId[to.node];
+      if (!a || !b) return;                                             // unknown node → leave it to flow build
+      ctx.diagram.connector([a, from.port || 'out'], [b, to.port || 'in'], { alpha: 0.2 });
+    };
+    (ir.flows || []).forEach(f => {
+      const r = f.route || [];
+      for (let i = 0; i + 1 < r.length; i++) link(r[i], r[i + 1]);      // linear hops
+      if (f.fork && r.length) { const last = r[r.length - 1];          // branch: last route node → each option
+        (f.fork.options || []).forEach(o => link(last, o)); }
+    });
+  }
+
   function buildFlows(ir, ctx) {
     // Safe mode (ctx.safe) — defence in depth for an IR handed in directly (bypassing the parser's
     // gate): the Tier-2 host escapes are refused before any flow is wired.
@@ -858,6 +1053,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           (ir.periodics || []).some(p => hasCall(p.actions)))
         throw new Error("scene: 'call' is disabled in safe mode");
     }
+    deriveEdges(ir, ctx);                                               // opt-in faint connectors under the dots
     const rt = new DK.FlowRuntime();
     const rand = ctx.rng || Math.random;
     (ir.modes || []).forEach(m => rt.defineMode(m.name, m.effects));   // toggleable; rate effects speed sources
@@ -945,13 +1141,35 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
         }
       }
     };
+    // Fan-in / join barriers: `join <node> : <inputA> <inputB> …`. A barrier node fires (pulses + runs
+    // its arrival actions) only after every named input has arrived; each arrival is deduped by input id,
+    // and the barrier resets once complete so a later round waits again. A packet arriving at a barrier
+    // from a non-barrier input still travels; it just parks silently until the last input completes the set.
+    const joins = {};                                                   // node id → { inputs:Set, arrived:Set }
+    (ir.joins || []).forEach(j => {
+      if (!ctx.byId[j.node]) throw new Error('scene: join references unknown node "' + j.node + '"');
+      j.inputs.forEach(id => { if (!ctx.byId[id]) throw new Error('scene: join "' + j.node + '" references unknown input "' + id + '"'); });
+      joins[j.node] = { inputs: new Set(j.inputs), arrived: new Set() };
+    });
+    // Record an arrival at a barrier from `fromId`; returns true iff this arrival completed the set (then resets).
+    const barrierArrive = (b, fromId) => {
+      if (b.inputs.has(fromId)) b.arrived.add(fromId);
+      if (b.arrived.size < b.inputs.size) return false;
+      b.arrived.clear(); return true;
+    };
     // leg/style builders. fl supplies the error id + colour/r; usable by a flow OR an `on` handler.
-    const styleFor = fl => () => ({ style: { color: fl.color || DK.Theme.hot, r: fl.r || 3.4 } });
+    // fl.color is a `#token`/`#hex` → resolve against the active theme (maps per theme), else theme.hot.
+    const flowTheme = (ctx.diagram && ctx.diagram.theme) || DK.Theme;
+    const styleFor = fl => () => ({ style: { color: DK.resolveColor(fl.color, flowTheme) || flowTheme.hot, r: fl.r || 3.4 } });
     const legFor = fl => { const style = styleFor(fl);
       const leg = (a, b, penv) => {                             // a→b hop; pulses b + runs its actions on arrival
-        const to = nodeOf(fl, tpl(b.node, penv));
-        return { from: [nodeOf(fl, tpl(a.node, penv)), tpl(a.port, penv) || 'out'], to: [to, tpl(b.port, penv) || 'in'],
-          dur: b.dur || 0.6, onArrive: p => { if (to.pulse) to.pulse(ctx.diagram.now); runActions(b.actions, penv, leg, style, p); } };
+        const to = nodeOf(fl, tpl(b.node, penv)), toId = tpl(b.node, penv), fromId = tpl(a.node, penv);
+        const barrier = joins[toId];                            // is the destination a fan-in barrier?
+        return { from: [nodeOf(fl, fromId), tpl(a.port, penv) || 'out'], to: [to, tpl(b.port, penv) || 'in'],
+          dur: b.dur || 0.6, onArrive: p => {
+            if (barrier && !barrierArrive(barrier, fromId)) return;     // parked: waiting on the other inputs
+            if (to.pulse) to.pulse(ctx.diagram.now); runActions(b.actions, penv, leg, style, p);
+          } };
       }; return leg; };
     // `on <event>(params): actions` → a runtime event handler (fired by `after … : event` / emit).
     (ir.events || []).forEach(ev => {
@@ -978,8 +1196,14 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       if (branchable) fork.options.forEach(o => { if (!isTpl(o.node)) nodeOf(fl, o.node); });  // templates: at fire time
       const style = styleFor(fl);
       const leg = legFor(fl);
-      const pick = () => {                                       // weighted choose-one
-        const opts = fork.options, total = opts.reduce((s, o) => s + (o.weight || 1), 0);
+      const guarded = branchable && fork.options.some(o => o.guard != null);
+      const pick = penv => {
+        const opts = fork.options;
+        if (guarded) {                                          // content-based: first true guard wins
+          for (const o of opts) if (o.guard != null && Flow.evalExpr(o.guard, envOf(penv))) return o;
+          return opts.find(o => o.guard == null) || opts[opts.length - 1];   // else = first unguarded (or last)
+        }
+        const total = opts.reduce((s, o) => s + (o.weight || 1), 0);   // weighted choose-one
         let x = rand() * total;
         for (const o of opts) { x -= (o.weight || 1); if (x < 0) return o; }
         return opts[opts.length - 1];
@@ -990,7 +1214,8 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
         return penv;
       };
       rt.source({
-        interval: () => fl.rate || 1,
+        interval: () => 1 / (fl.rate || 1),          // rate is packets-per-second → seconds-between = 1/rate
+
         guard: () => ctx.diagram.flow.size < (fl.max || 200),
         fire: () => {
           const penv = bindPick();
@@ -1000,7 +1225,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           const from = route[route.length - 1];                 // the branch-from node
           if (!branchable) { if (prefix.length) ctx.diagram.flow.spawn(prefix, style()); return; }
           if (fork.mode === 'pick') {
-            ctx.diagram.flow.spawn(prefix.concat([leg(from, pick(), penv)]), style());
+            ctx.diagram.flow.spawn(prefix.concat([leg(from, pick(penv), penv)]), style());
           } else {                                               // 'all' → fan out at the branch node
             const fan = () => fork.options.forEach(o => ctx.diagram.flow.spawn([leg(from, o, penv)], style()));
             if (!prefix.length) { fan(); return; }
@@ -1014,8 +1239,8 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     return rt;
   }
 
-  const API = { build, recorder, register, KINDS, resolveLayout, resolveZones, buildFlows, dimDefaults: DIM_DEFAULTS,
-    layoutDefaults: { pad: LAYOUT_PAD, gap: LAYOUT_GAP } };
+  const API = { build, recorder, register, KINDS, resolveLayout, resolveZones, autoDeclareTracks, deriveEdges, buildFlows, dimDefaults: DIM_DEFAULTS,
+    layoutDefaults: { pad: LAYOUT_PAD, gap: LAYOUT_GAP, autoSlotW: AUTO_SLOT_W, autoBandH: AUTO_BAND_H } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   /* node:coverage disable */                         // browser UMD tail (window.SceneBuilder) — unreachable under node
   else global.SceneBuilder = API;
@@ -1037,13 +1262,13 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
  *
  * Grammar (one statement per line; `#` starts a comment; blank lines ignored):
  *   diagram "Title" 1200x600 [theme]
- *   palette <name> = <color> <color> ...        # enables palette refs, e.g. `name0`, `name1`
  *   zone  <id> "Label" x:.. y:.. w:.. h:..    # or infer the box: `lane:<id>`/`lanes:[..]` (+ `rail:`/`rails:[..]`)
- *   node  <id> <kind> [flag ...] [key:value ...]
+ *   node  <id> [<kind>] [flag ...] [key:value ...]  # kind defaults to 'box' when omitted or when the next token is a kv/colour
  *   edge  <from> -> <to> [key:value ...]        # a Connector; keys become its style
  *   road  <from> ~> <to> [key:value ...]        # a Channel (fat animated edge)
  * where <from>/<to> is `id`, `id.port`, or `x,y`; an id with no port defaults to .out (from) / .in (to).
- * Values coerce: 12 → number, #abc → colour, name3 → palette[name][3], a|b|c → array, "x" → string,
+ * Colours carry a `#` sigil: `#hex` or a `#name` theme token (resolved against the theme at build; see
+ * flowdot.js resolveColor). Values coerce: 12 → number, `#…` → colour token, a|b|c → array, "x" → string,
  * a bare token (no `:`) on node/zone → a boolean flag (e.g. `boxed`, `vertical`, `pinned`).
  *
  * UMD: attaches to `window.Flow` in the browser and `module.exports` under node.
@@ -1088,11 +1313,11 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     return out;
   }
 
-  // Coerce a value token to number / colour / palette ref / array / string.
+  // Coerce a value token to number / array / string.
   //   [a, b, "c d"] → array (comma/space separated, quote-aware); each element coerces.
   //   "…"           → ALWAYS a literal string (quotes never make an array).
-  //   #rgb/#rrggbb  → colour · name<digit> → palette ref · 12/-3.5 → number · else bareword.
-  function coerce(tok, palettes) {
+  //   12/-3.5 → number · else the raw string (`#colour-token`, bareword, id.port, …).
+  function coerce(tok) {
     const quoted = tok[0] === '"';
     // Template attribute: `(i,j)=>{expr}` (or `(i,j)=>expr`) → a function evaluated per call with the
     // params bound (e.g. a Matrix cellNote). No spaces around `=>`. The body binds ONLY its params.
@@ -1106,19 +1331,24 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       }
     }
     if (!quoted && tok[0] === '[' && tok[tok.length - 1] === ']')  // bracket list
-      return splitList(tok.slice(1, -1)).map(x => coerce(x, palettes));
+      return splitList(tok.slice(1, -1)).map(x => coerce(x));
     const s = unquote(tok);
     if (quoted) return s;                                          // a quoted literal is always a string
-    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s)) return s;    // colour
-    const pal = /^([A-Za-z_]+)(\d+)$/.exec(s);                     // palette ref: series0, feed2, …
-    if (pal && palettes[pal[1]]) {
-      const arr = palettes[pal[1]], i = +pal[2];
-      if (i >= arr.length)                                         // catch a typo'd index, don't leak a string
-        throw new Error('flow: palette "' + pal[1] + '" has no index ' + i + ' (size ' + arr.length + ')');
-      return arr[i];
-    }
     if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);              // number
-    return s;                                                     // bareword string
+    return s;                                                     // #colour-token, bareword, etc. (colours resolve at build)
+  }
+
+  // Colours carry a `#` sigil (a #hex like #5cb4ff or a #name like #sky), or are an rgb()/hsl() function.
+  // The parser only enforces the SIGIL — a bareword like `red` (missing #) is the loud error. What a
+  // #name actually means is resolved against the active theme at BUILD time (scene → Flowdot.resolveColor):
+  // #hex/#css-name stay literal, #token/#role map per theme. The parser can't do that (theme tokens live
+  // in the renderer and custom themes register at runtime), so it defers — an unknown #token errors at build.
+  const COLOR_KEYS = new Set(['accent', 'color', 'colColors', 'tint', 'c', 'pulseColor', 'stroke', 'fill', 'glow']);
+  const isColor = v => typeof v === 'string' && (v[0] === '#' || /^(rgb|rgba|hsl|hsla)\(/i.test(v));
+  function validateColor(key, val, ln) {
+    for (const v of (Array.isArray(val) ? val : [val])) if (!isColor(v))
+      throw new Error('flow: line ' + ln + ': "' + key + '" needs a colour with a "#" sigil — a #hex ' +
+        '(#5cb4ff) or a #name (#sky), or rgb()/hsl(); got "' + v + '"');
   }
 
   // Per-kind attribute schema — the top agent-safety guardrail: a misspelled/unknown key on a known
@@ -1133,6 +1363,9 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     pipeline: NODE_COMMON.concat(['stages', 'nodeR', 'idle', 'vertical', 'boxed', 'pinned', 'name', 'accent', 'pad', 'step']),
     zone:     ['id', 'kind', 'x', 'y', 'w', 'h', 'label', 'tint', 'accent', 'inspect', 'hoverable', 'lane', 'lanes', 'rail', 'rails'],
   };
+  // Accepted style keys on an `edge` (a Connector). A key outside this set throws instead of being
+  // silently kept-and-ignored. Colour is a bare `#token` (→ `c`); `dashed` is a bare flag.
+  const EDGE_KEYS = new Set(['label', 'alpha', 'dash', 'dashed', 'c', 'pulseColor', 'lw']);
   function validateKeys(obj, kind, ln) {
     const allowed = KIND_KEYS[kind];
     if (!allowed) return;                                          // custom/unknown kind → not our schema
@@ -1142,12 +1375,27 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
         '" (valid: ' + allowed.filter(x => x !== 'id' && x !== 'kind').join(', ') + ')');
   }
 
-  // Fold "flag" and "key:value" tokens into an object.
-  function applyKV(obj, toks, palettes) {
+  // Which attribute a BARE `#token` colour sets, per kind: box/core/pipeline/zone paint via `accent`,
+  // ring/road/flow via `color`, edge via `c`. So `node q core #sky` == `accent:#sky`, `road a ~> b #emerald`
+  // == `color:#emerald`. matrix has no single colour (its columns use `colColors`), so a bare colour on it
+  // lands on `color` and trips its schema — use `colColors:[…]` there.
+  const KIND_COLOR_KEY = { box: 'accent', core: 'accent', pipeline: 'accent', zone: 'accent', ring: 'color' };
+  const colorKeyFor = kind => KIND_COLOR_KEY[kind] || 'color';
+  // Kinds whose single default colour a `colors <kind>:#tok` statement can override (they paint through
+  // themeKindColor). matrix (per-column `colColors` ramp) and flow (packet colour = its route/road) use
+  // other colour models, so they are not overridable this way.
+  const OVERRIDE_KINDS = new Set(['box', 'core', 'ring', 'pipeline', 'zone', 'road', 'edge']);
+
+  // Fold "flag" and "key:value" tokens into an object. A bare `#token`/rgb() (no key) is the element's
+  // colour — assigned to `colorKey` (the kind's colour attribute); its MEANING resolves at build.
+  function applyKV(obj, toks, ln, colorKey) {
     for (const t of toks) {
       const c = t.indexOf(':');
-      if (c > 0 && t[0] !== '"') obj[t.slice(0, c)] = coerce(t.slice(c + 1), palettes);
-      else obj[unquote(t)] = true;                                 // bare token → boolean flag
+      if (c > 0 && t[0] !== '"') { const key = t.slice(0, c), v = coerce(t.slice(c + 1));
+        if (ln != null && COLOR_KEYS.has(key)) validateColor(key, v, ln);   // catch a typo'd colour name
+        obj[key] = v; }
+      else if (colorKey && isColor(t)) obj[colorKey] = coerce(t);  // bare colour → the kind's colour attr
+      else obj[unquote(t)] = true;                                 // other bare token → boolean flag
     }
     return obj;
   }
@@ -1238,14 +1486,16 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     return out.length ? out : null;
   }
 
+  // Shared route helpers: used by both parseLinearRoute (spawn) and the `flow` route parser.
+  const durOf = tok => { const m = /^~(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
+  const rn = tok => { const d = tok.indexOf('.'); return d < 0 ? { node: tok } : { node: tok.slice(0, d), port: tok.slice(d + 1) }; };
+
   // Parse a hop's `{ verb …; verb … }` block body into [Action]. Closed verb set; anything else is a
   // loud, located error. set/write carry an expr string (evaluated at run time against the store).
   // A linear route `a ~0.5 b ~0.6 c` → [{node:'a'},{node:'b',dur:0.5},{node:'c',dur:0.6}]. Used by
   // the `spawn` action (a secondary packet); no branches. Node refs may be `id.port` or `{tpl}`.
   function parseLinearRoute(str, ln) {
     const toks = str.trim().split(/\s+/);
-    const durOf = tok => { const m = /^~(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
-    const rn = tok => { const d = tok.indexOf('.'); return d < 0 ? { node: tok } : { node: tok.slice(0, d), port: tok.slice(d + 1) }; };
     if (!toks.length || durOf(toks[0]) != null) throw new Error('flow: line ' + ln + ': spawn route must start with a node');
     const hops = [rn(toks[0])];
     for (let k = 1; k < toks.length;) {
@@ -1315,7 +1565,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
 
   // ── module include: `import "<path.flow>"` ──────────────────────────────────────────────────────
   // A preprocessor that INLINES an imported source's text in place of the import line (before expand /
-  // parse), so a shared palette / node library merges into the diagram. Resolution:
+  // parse), so a shared node/theme library merges into the diagram. Resolution:
   //   • opts.resolveImport(path, base) → text   — caller-supplied (the browser: preload / fetch first)
   //   • else, under node: fs.readFileSync(path.resolve(base, path)) relative to the importing file
   // Cycles throw ("import cycle"); a missing file / null resolver throws ("cannot import"). Gated by
@@ -1357,13 +1607,13 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     opts = opts || {};
     const safe = !!opts.safe;
     text = inlineImports(text, opts, opts.base, null);               // merge `import`s (throws if safe)
-    const ir = { zones: [], nodes: [], edges: [] }, palettes = {};
+    const ir = { zones: [], nodes: [], edges: [] };
     expand(text).forEach(({ text: line, ln }) => {
-      // Tokenize first, THEN drop a trailing comment — so `#5ef2a0` (a colour) survives while
-      // `# note` (hash then space) and `#note` (hash then non-hex) are treated as comments.
+      // Tokenize first, THEN drop a trailing comment — a comment starts at a STANDALONE `#` token
+      // (`… # note` → the space-separated `#`). A glued `#…` token (`#5ef2a0`, `#sky`, `#steelblue`)
+      // is a bare colour and survives; write comments with a space after the hash.
       const toks = tokenize(line);
-      const ci = toks.findIndex(tk => tk === '#' ||
-        (tk[0] === '#' && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(tk)));
+      const ci = toks.findIndex(tk => tk === '#');
       const t = ci < 0 ? toks : toks.slice(0, ci);
       if (!t.length) return;
       const kw = t[0];
@@ -1385,7 +1635,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           break;
         }
         case 'behavior': {   // behaviour section header; may carry `seed:N` inline (`behavior seed:42`)
-          const rest = applyKV({}, t.slice(1), palettes);
+          const rest = applyKV({}, t.slice(1));
           if (rest.seed != null) ir.seed = typeof rest.seed === 'number' ? rest.seed : Number(rest.seed);
           ir.behavior = true;
           break;
@@ -1413,7 +1663,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           const rate = Number(String(m[1]).replace(/s$/, ''));
           if (!Number.isFinite(rate)) throw new Error('flow: line ' + ln + ': every rate must be a number, got "' + m[1] + '"');
           let list;
-          if (m[3][0] === '[') list = coerce(m[3], palettes);
+          if (m[3][0] === '[') list = coerce(m[3]);
           else { const rg = /^(-?\d+)\.\.(-?\d+)$/.exec(m[3]); if (!rg) throw new Error('flow: line ' + ln + ': every list must be a [bracket list] or a range');
             list = []; for (let i = +rg[1]; i <= +rg[2]; i++) list.push(i); }
           const pd = { var: m[2], list, rate, actions: parseActions(m[5], ln, safe) };
@@ -1438,6 +1688,28 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           ir.controls = true;
           break;
         }
+        case 'theme-toggle': {   // opt-in dark↔light toggle button; boot() auto-renders it (re-mounts on flip)
+          ir.themeToggle = true;
+          break;
+        }
+        case 'auto-edges': {     // opt-in: derive a faint connector per flow-route hop (scene.buildFlows)
+          ir.autoEdges = true;
+          break;
+        }
+        case 'colors': {         // per-kind colour override: `colors road:#emerald core:#sky` — a
+          // diagram-wide default per kind, layered over the theme (inline #token wins; theme is the floor)
+          const kc = ir.kindColors || (ir.kindColors = {});
+          for (const tok of t.slice(1)) {
+            const c = tok.indexOf(':');
+            if (c <= 0) throw new Error('flow: line ' + ln + ': colors expects "<kind>:#colour" pairs, got "' + tok + '"');
+            const kind = tok.slice(0, c), val = coerce(tok.slice(c + 1));
+            if (!OVERRIDE_KINDS.has(kind)) throw new Error('flow: line ' + ln + ': colors has no kind "' + kind +
+              '" (valid: ' + [...OVERRIDE_KINDS].join(', ') + ')');
+            validateColor(kind, val, ln);
+            kc[kind] = val;
+          }
+          break;
+        }
         case 'seed': {       // `seed 42` or `seed 0x51F0` → ir.seed (a number seeding the runtime RNG)
           const raw = t[1];
           const n = /^0x[0-9a-fA-F]+$/.test(raw || '') ? parseInt(raw, 16) : Number(raw);
@@ -1445,34 +1717,52 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           ir.seed = n;
           break;
         }
-        case 'palette': {
-          const name = t[1], eq = t.indexOf('=');
-          palettes[name] = t.slice(eq + 1);
-          (ir.palette || (ir.palette = {}))[name] = palettes[name];
-          break;
-        }
         case 'zone': {
           const z = { id: t[1] }; let i = 2;
           if (t[i] && t[i][0] === '"') { z.label = unquote(t[i]); i++; }
-          applyKV(z, t.slice(i), palettes); validateKeys(z, 'zone', ln); ir.zones.push(z);
+          applyKV(z, t.slice(i), ln, 'accent'); validateKeys(z, 'zone', ln); ir.zones.push(z);
+          break;
+        }
+        case 'note': {   // a documentation callout: note "text" -> <nodeId>  (chip + leader line)
+          const ai = t.indexOf('->');
+          if (ai !== 2 || !t[1] || t[1][0] !== '"' || t[ai + 1] == null)
+            throw new Error('flow: line ' + ln + ': note must be `note "text" -> <nodeId>`');
+          (ir.notes || (ir.notes = [])).push({ text: unquote(t[1]), target: t[ai + 1] });
+          break;
+        }
+        case 'legend': { // an opt-in colour key: legend "label" #colour  (one row per line)
+          if (!t[1] || t[1][0] !== '"' || !isColor(t[2] || ''))
+            throw new Error('flow: line ' + ln + ': legend must be `legend "label" #colour`');
+          (ir.legend || (ir.legend = [])).push({ label: unquote(t[1]), color: coerce(t[2]) });
+          break;
+        }
+        case 'join': {   // fan-in barrier: `join <nodeId> : <inputA> <inputB> …` — the node fires
+          //                 (pulses + runs its arrival actions) only once every named input has arrived.
+          const ci = t.indexOf(':');
+          const inputs = ci >= 0 ? t.slice(ci + 1) : [];
+          if (!t[1] || ci !== 2 || inputs.length < 2)
+            throw new Error('flow: line ' + ln + ': join must be `join <nodeId> : <inputA> <inputB> …` (≥2 inputs)');
+          (ir.joins || (ir.joins = [])).push({ node: t[1], inputs });
           break;
         }
         case 'lane': {   // layout column: lane <id> x:.. w:..  (used by node lane:<id>)
           const L = { id: t[1] };
-          applyKV(L, t.slice(2), palettes);
+          applyKV(L, t.slice(2));
           (ir.lanes || (ir.lanes = [])).push(L);
           break;
         }
         case 'rail': {   // layout row: rail <id> <y>  or  rail <id> y:..  (used by node rail:<id>)
           const R = { id: t[1] }; let i = 2;
           if (t[i] != null && /^-?\d+(?:\.\d+)?$/.test(t[i])) { R.y = Number(t[i]); i++; }
-          applyKV(R, t.slice(i), palettes);
+          applyKV(R, t.slice(i));
           (ir.rails || (ir.rails = [])).push(R);
           break;
         }
         case 'node': {
-          const n = { id: t[1], kind: t[2] };
-          applyKV(n, t.slice(3), palettes); validateKeys(n, n.kind, ln); ir.nodes.push(n);
+          const hasKind = t[2] != null && !t[2].startsWith('#') && !t[2].includes(':');
+          const kind = hasKind ? t[2] : 'box';
+          const n = { id: t[1], kind };
+          applyKV(n, hasKind ? t.slice(3) : t.slice(2), ln, colorKeyFor(kind)); validateKeys(n, n.kind, ln); ir.nodes.push(n);
           break;
         }
         case 'edge':
@@ -1480,10 +1770,16 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           const arrow = kw === 'road' ? '~>' : '->', ai = t.indexOf(arrow);
           if (ai < 0) throw new Error('flow: line ' + ln + ': ' + kw + ' needs "' + arrow + '"');
           const e = { from: ref(t[ai - 1], 'out'), to: ref(t[ai + 1], 'in') };
-          const rest = applyKV({}, t.slice(ai + 2), palettes);
+          const rest = applyKV({}, t.slice(ai + 2), ln, kw === 'road' ? 'color' : 'c');
           if (rest.id) { e.id = rest.id; delete rest.id; }
-          if (kw === 'road') { e.kind = 'road'; Object.assign(e, rest); }
-          else e.style = rest;
+          if (kw === 'road') { e.kind = 'road';
+            if (rest.width != null && (typeof rest.width !== 'number' || rest.width <= 0))
+              throw new Error('flow: line ' + ln + ': road width must be a positive number, got "' + rest.width + '"');
+            Object.assign(e, rest); }
+          else {                                        // edge: validate style keys (no more silent-swallow)
+            for (const k of Object.keys(rest)) if (!EDGE_KEYS.has(k))
+              throw new Error('flow: line ' + ln + ': "edge" has no attribute "' + k + '" (valid: ' + [...EDGE_KEYS].join(', ') + ')');
+            e.style = rest; }
           ir.edges.push(e);
           break;
         }
@@ -1500,23 +1796,23 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
           // Each list is a [bracket list] (coerced to an array). The vars bind a random element per fire.
           const pickIdx = header.indexOf('pick');
           if (pickIdx >= 0) {
-            applyKV(f, header.slice(0, pickIdx), palettes);
+            applyKV(f, header.slice(0, pickIdx), ln, 'color');
             const picks = []; let pk = pickIdx + 1;
             while (pk < header.length) {
               const v = (header[pk++] || '').replace(/,$/, '');
               if (header[pk++] !== 'in') throw new Error('flow: line ' + ln + ': pick expects "<var> in <list>"');
               const listTok = (header[pk++] || '').replace(/,$/, '');
-              const list = coerce(listTok, palettes);
+              const list = coerce(listTok);
               if (!Array.isArray(list)) throw new Error('flow: line ' + ln + ': pick list must be a [bracket list], got "' + listTok + '"');
               picks.push({ var: v, list });
             }
             f.pick = picks;
-          } else applyKV(f, header, palettes);
+          } else applyKV(f, header, ln, 'color');
+          if (f.rate != null && (typeof f.rate !== 'number' || f.rate <= 0))
+            throw new Error('flow: line ' + ln + ': flow rate must be a positive number (packets per second), got "' + f.rate + '"');
           const rt = ci >= 0 ? t.slice(ci + 1) : [];
           if (rt.length) {
             // a route node is `id` or `id.port` (port may contain ':', e.g. grid.colTop:0)
-            const rn = tok => { const d = tok.indexOf('.'); return d < 0 ? { node: tok } : { node: tok.slice(0, d), port: tok.slice(d + 1) }; };
-            const durOf = tok => { const m = /^~(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
             const wOf = tok => { const m = /^@(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
             const actOf = tok => (tok && tok[0] === '{' && tok[tok.length - 1] === '}') ? tok.slice(1, -1) : null;
             const bad = msg => { throw new Error('flow: line ' + ln + ': ' + msg); };
@@ -1540,28 +1836,32 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
               if (s0[k] == null || durOf(s0[k]) != null || wOf(s0[k]) != null || actOf(s0[k]) != null) bad('"~dur" without a node');
               const hop = Object.assign(rn(s0[k++]), { dur });
               const w = wOf(s0[k]); if (w != null) { hop.weight = w; k++; }
+              if (s0[k] === 'when') { k++; const gt = []; while (k < s0.length && actOf(s0[k]) == null) gt.push(s0[k++]); if (!gt.length) bad('when needs a condition'); hop.guard = gt.join(' '); }
               takeActions(hop);
               hops.push(hop);
             }
 
             if (!sep) {
+              if (hops.some(h => h.guard != null)) bad('when is only valid on a "|" branch option');
               f.route = hops.map(clean);                       // plain linear route
             } else {
               if (hops.length < 2) bad('a flow branch needs a node to branch from');
-              const opt = h => Object.assign(clean(h), { weight: h.weight != null ? h.weight : 1 });
+              const opt = h => { const o = Object.assign(clean(h), { weight: h.weight != null ? h.weight : 1 }); if (h.guard != null) o.guard = h.guard; return o; };
               const options = [opt(hops.pop())];               // seg0's tail hop is the first option
               for (let s = 1; s < segs.length; s++) {
                 const seg = segs[s], dur = durOf(seg[0]);
                 if (dur == null || seg[1] == null) bad('branch option must be "~dur node [@weight]"');
-                const h = Object.assign(rn(seg[1]), { dur });   // ~dur node [@weight] [{actions}]
+                const h = Object.assign(rn(seg[1]), { dur });   // ~dur node [@weight] [when <cond>] [{actions}]
                 let j = 2;
                 const w = wOf(seg[j]); if (w != null) { h.weight = w; j++; }
+                if (seg[j] === 'when') { j++; const gt = []; while (j < seg.length && actOf(seg[j]) == null) gt.push(seg[j++]); if (!gt.length) bad('when needs a condition'); h.guard = gt.join(' '); }
                 const a = actOf(seg[j]); if (a != null) { h.actions = parseActions(a, ln, safe); j++; }
                 if (seg.length > j) bad('a branch option must be "~dur node [@weight] [{actions}]"');
                 options.push(opt(h));
               }
               f.route = hops.map(clean);                       // the linear prefix (branch node last)
               f.fork = { mode: sep === '|' ? 'pick' : 'all', options };
+              if (f.fork.mode === 'all' && options.some(o => o.guard != null)) bad('when guards are only for a "|" pick, not "&" fan-out');
             }
           }
           (ir.flows || (ir.flows = [])).push(f);
@@ -1630,11 +1930,18 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       const el = resolveEl(opts.showSource);
       if (el) el.textContent = source;
     }
+    // Theme precedence: opts.diagram.theme (the toggle override) > `diagram … <theme>` (ir.theme) >
+    // the browser's prefers-color-scheme. `themeName` is the one actually used, surfaced on the result
+    // so the toggle can label its initial state correctly.
+    const themeName = (opts.diagram && opts.diagram.theme != null) ? opts.diagram.theme
+      : (ir.theme != null ? ir.theme : prefersColorScheme(opts));
     const diagram = isDiagramLike(target) ? target
       : new DK.Diagram(typeof target === 'string' ? document.querySelector(target) : target,
-          Object.assign({ width: ir.width, height: ir.height, theme: ir.theme }, opts.diagram));
+          Object.assign({ width: ir.width, height: ir.height, theme: themeName }, opts.diagram));
 
     const built = Scene.build(ir, diagram);
+    if (ir.warnings && typeof console !== 'undefined' && console.warn)   // e.g. ambiguous auto-declared rail order
+      ir.warnings.forEach(w => console.warn(w));
     // Seed precedence: an explicit opts.rng wins; then opts.seed (e.g. the <script data-seed>) as an
     // override; then the source's own `seed N` (ir.seed) as its declared default.
     const seed = opts.seed != null ? opts.seed : ir.seed;
@@ -1660,7 +1967,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       rt._events = {}; rt._onFrame = null; rt._afterFrame = null;
       if (diagram.flow && Array.isArray(diagram.flow.packets)) diagram.flow.packets.length = 0;
     };
-    return { ir, diagram, rt, byId: built.byId, edgesById: built.edgesById, dispose };
+    return { ir, diagram, rt, theme: themeName, byId: built.byId, edgesById: built.edgesById, dispose };
   }
 
   // boot(root?, mountFn?) → [results] — mount every opted-in <script type="text/flow" data-flowdot>.
@@ -1680,33 +1987,71 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
       opts.safe = !(el.dataset && el.dataset.unsafe != null);           // embed = untrusted → safe by default (opt out: data-unsafe)
       const res = run(canvas, (el.textContent || '').trim(), opts);
       canvas.__flowdot = res;                                         // handle for debugging / tests
-      renderModeControls(doc, canvas, res);                           // zero-JS toggle per declared mode
-      if ((el.dataset && el.dataset.controls != null) || (res.ir && res.ir.controls))
-        renderTransportControls(doc, canvas, res);                    // zero-JS play/pause + reset + speed
       res.exportPNG = exportPNG(canvas, doc, res.ir && res.ir.title); // imperative: save the frame as PNG
-      if (el.dataset && el.dataset.export != null) renderExportControl(doc, canvas, res.exportPNG);  // opt-in button
+
+      // Shared re-mount plumbing. The theme toggle and live edit both re-mount the source into the SAME
+      // canvas, so they share `remountOpts` (a toggled theme survives a later edit) and the `current`
+      // handle. `remount(text)` disposes the old diagram and re-renders the auto control bars (each
+      // renderer drops its prior bar, so no stacking). Re-mount skips showSource so it never clobbers
+      // what the user is typing.
+      const controlsOn = r => (el.dataset && el.dataset.controls != null) || (r.ir && r.ir.controls);
+      const editable = !!(el.dataset && el.dataset.editable != null && el.dataset.source && doc.querySelector);
+      const panel = editable ? doc.querySelector(el.dataset.source) : null;
+      const remountOpts = Object.assign({}, opts); delete remountOpts.showSource;
+      const wantToggle = !!((el.dataset && el.dataset.themeToggle != null) || (res.ir && res.ir.themeToggle));
+      let current = res, themeName = res.theme || (res.ir && res.ir.theme) || 'dark';
+      const currentSource = () => ((panel && panel.value != null ? panel.value : (el.textContent || '')) + '').trim();
+      function renderBars(r) {
+        renderModeControls(doc, canvas, r);                           // zero-JS toggle per declared mode
+        if (controlsOn(r)) renderTransportControls(doc, canvas, r);   // zero-JS play/pause + reset + speed
+        if (wantToggle) renderThemeToggle(doc, canvas, themeName, flipTheme);   // zero-JS dark↔light
+      }
+      function remount(text) {
+        if (current && typeof current.dispose === 'function') current.dispose();
+        current = run(canvas, text, remountOpts);
+        current.exportPNG = exportPNG(canvas, doc, current.ir && current.ir.title);
+        canvas.__flowdot = current;
+        renderBars(current);
+        return current;
+      }
+      // Flip dark↔light and re-mount (the theme is fixed at Diagram construction, so a live swap IS a
+      // re-mount). The override lives in remountOpts.diagram.theme so a subsequent edit keeps it.
+      function flipTheme() {
+        themeName = themeName === 'light' ? 'dark' : 'light';
+        remountOpts.diagram = Object.assign({}, remountOpts.diagram, { theme: themeName });
+        remount(currentSource());
+      }
+      // Zero-JS inspector: a sibling [data-flow-inspector] element captures its innerHTML as the
+      // default text and is wired to diagram.inspector() so hover-inspect works without page JS.
+      const insEl = el.parentNode && el.parentNode.querySelector
+        ? el.parentNode.querySelector('[data-flow-inspector]') : null;
+      const insDefault = insEl ? (insEl.innerHTML || '') : '';
+      function wireInspector(r) {
+        if (insEl && r && r.diagram && typeof r.diagram.inspector === 'function')
+          r.diagram.inspector(insEl, insDefault);
+      }
+      const _renderBars = renderBars;
+      renderBars = r => { _renderBars(r); wireInspector(r); };
+      renderBars(res);                                                // initial control bars
+      if (el.dataset && el.dataset.export != null) renderExportControl(doc, canvas, res.exportPNG);  // opt-in button (once)
+
       // Opt-in live editing: `data-editable` makes the data-source panel editable; a debounced edit
-      // disposes the current diagram and re-mounts the new source into the SAME canvas. (Inline error
-      // display for a bad edit is wired in the next task.) Re-mount skips showSource so it doesn't
-      // clobber what the user is typing.
-      if (el.dataset && el.dataset.editable != null && el.dataset.source && doc.querySelector) {
-        const panel = doc.querySelector(el.dataset.source);
+      // dry-validates then re-mounts the new source into the SAME canvas (keeping the last good diagram
+      // on a bad edit).
+      if (editable) {
         const delay = el.dataset.debounce != null ? +el.dataset.debounce : 250;
-        const remountOpts = Object.assign({}, opts); delete remountOpts.showSource;
-        let current = res;
         liveEdit(panel, text => {
           const t = (text || '').trim();
-          try { validateSource(t, remountOpts.safe); }              // dry-run FIRST — never tear down on a bad edit
-          catch (e) { showError(doc, panel, e.message); return; }   // keep the last good diagram, show the error
-          try {
-            if (current && typeof current.dispose === 'function') current.dispose();
-            current = run(canvas, t, remountOpts);
-            canvas.__flowdot = current;
-            renderModeControls(doc, canvas, current);
-            if ((el.dataset && el.dataset.controls != null) || (current.ir && current.ir.controls))
-              renderTransportControls(doc, canvas, current);
-            showError(doc, panel, null);                            // valid again → clear the error
-          } catch (e) { showError(doc, panel, e.message); }         // belt-and-braces (validated above)
+          try { validateSource(t, remountOpts.safe); }
+          catch (e) {
+            if (current && typeof current.dispose === 'function') current.dispose();  // clear stale diagram
+            current = null; canvas.__flowdot = null;
+            const g = canvas.getContext && canvas.getContext('2d');
+            if (g) g.clearRect(0, 0, canvas.width, canvas.height);
+            showError(doc, panel, e.message); return;
+          }
+          try { remount(t); showError(doc, panel, null); }          // valid again → clear the error frame
+          catch (e) { showError(doc, panel, e.message); }           // belt-and-braces (validated above)
         }, delay);
         // Context-aware Ctrl/Cmd+Space completion, on by default for editable panels (opt out with
         // data-autocomplete="off"). Library-level, so example pages get it with zero authored JS.
@@ -1781,11 +2126,38 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     canvas.__fvTransport = bar;
   }
 
+  // Auto-render a dark↔light theme toggle after the canvas — same mechanism as the mode/transport bars,
+  // opt-in via `data-theme-toggle` on the <script> or a `theme-toggle` line in the source. The button
+  // shows the ACTIVE theme; clicking calls back (boot re-mounts the source with the flipped theme). The
+  // page stays free of authored JS. No-op without a real DOM (the node recorder passes a fake).
+  function renderThemeToggle(doc, canvas, themeName, onToggle) {
+    if (canvas.__fvTheme && canvas.__fvTheme.remove) canvas.__fvTheme.remove();   // drop a prior bar (re-mount)
+    canvas.__fvTheme = null;
+    if (!doc || !doc.createElement || !canvas.parentNode || !canvas.parentNode.insertBefore) return;
+    const bar = doc.createElement('div'); bar.className = 'flow-theme';
+    const b = doc.createElement('button'); b.type = 'button'; b.className = 'flow-themebtn';
+    b.textContent = 'Theme: ' + themeName;                             // reflects the ACTIVE theme
+    b.onclick = () => onToggle();
+    if (bar.appendChild) bar.appendChild(b);
+    canvas.parentNode.insertBefore(bar, canvas.nextSibling);
+    canvas.__fvTheme = bar;
+    return bar;
+  }
+
   // prefers-reduced-motion: an explicit opts.reduceMotion wins; else read the media query if present.
   function prefersReducedMotion(opts) {
     if (opts.reduceMotion != null) return !!opts.reduceMotion;
     return (typeof global !== 'undefined' && global.matchMedia)
       ? !!global.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+  }
+
+  // prefers-color-scheme: the INITIAL theme when the source names none — 'dark' unless the browser
+  // asks for light (so themeless pages/tests without matchMedia stay dark, as before). An explicit
+  // `diagram … <theme>` (ir.theme) or an opts.diagram.theme override (the toggle) still wins upstream.
+  function prefersColorScheme(opts) {
+    if (opts && opts.colorScheme != null) return opts.colorScheme;    // explicit override (tests / hosts)
+    return (typeof global !== 'undefined' && global.matchMedia
+      && global.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
   }
 
   // Accessibility: label the canvas (role/aria-label/title from the diagram title) and give it a native
@@ -1840,9 +2212,11 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
   }
 
   // Show / clear a located error near the source panel (a `.flow-error` element inserted after it, on
-  // demand). Keeps the previous diagram visible while the source is invalid. No-op without a DOM.
+  // demand) and apply a red outline to the source panel itself as an immediate visual signal.
+  // No-op without a DOM.
   function showError(doc, panel, msg) {
     if (!panel) return;
+    if (panel.style) panel.style.outline = msg ? '2px solid #e64747' : '';  // instant red frame
     let box = panel.__fvError;
     if (msg) {
       if (!box && doc && doc.createElement && panel.parentNode && panel.parentNode.insertBefore) {
@@ -1897,8 +2271,8 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
 
   // ── Context-aware autocomplete for the editable panel ──────────────────────────────────────────
   // Statement keywords offered at the start of a line.
-  const KEYWORDS = ['diagram', 'flow', 'seed', 'theme', 'palette', 'set', 'import', 'model',
-    'lane', 'rail', 'zone', 'node', 'edge', 'road', 'flow', 'mode', 'every', 'on', 'call'];
+  const KEYWORDS = ['diagram', 'flow', 'seed', 'theme', 'set', 'import', 'model', 'colors',
+    'lane', 'rail', 'zone', 'node', 'edge', 'road', 'flow', 'mode', 'every', 'on', 'call', 'note', 'legend', 'join'];
 
   // Best-effort scan of the declared `lane`/`rail` ids in a (possibly mid-edit) source. Tolerant of
   // parse errors — a regex, not the parser — and understands the pipe form `lane a|b|c`.
@@ -2003,7 +2377,7 @@ flow f rate:0.8 color:series1 : src ~0.7 work ~0.7 sink
     return () => { if (panel.removeEventListener) { panel.removeEventListener('keydown', onKey); panel.removeEventListener('blur', close); } };
   }
 
-  const API = { mount, boot, liveEdit, wirePickers, suggest, attachAutocomplete, exportPNG, applyA11y, prefersReducedMotion, renderTransportControls };
+  const API = { mount, boot, liveEdit, wirePickers, suggest, attachAutocomplete, exportPNG, applyA11y, prefersReducedMotion, prefersColorScheme, renderTransportControls, renderThemeToggle };
   if (isNode) module.exports = API;
   /* node:coverage disable */                         // browser UMD tail: attach + auto-boot on DOMContentLoaded — unreachable under node
   else {

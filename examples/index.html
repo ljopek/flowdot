@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Flowdot — examples</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
 <!-- Two-pane gallery: the list on the left opens each example in the <iframe> on the right. Zero
      JavaScript — anchors target the named iframe, so it works from file:// too. Generated from the
      curated example manifest by tools/build.js; edit the manifest, not this file. -->
@@ -30,7 +31,7 @@
 <body>
 <div class="app">
   <aside>
-    <h1>Flowdot examples</h1>
+    <h1><img src="assets/flowdot-logo.png" alt="Flowdot" width="120" height="120" style="display:block;margin:0 auto 8px">Flowdot examples</h1>
     <p class="sub">Click any example — it opens in the pane on the right. Every example is
       <b>zero-JavaScript</b> and shows its <code>.flow</code> source below the diagram.</p>
 
@@ -55,8 +56,8 @@
     <a class="card" href="modes/index.html" target="fvp"><div class="name">modes</div><div class="desc">A <code>storm</code> mode toggle — sources fire faster while active.</div></a>
 
     <h2>Theming</h2>
-    <a class="card" href="palette-colors/index.html" target="fvp"><div class="name">palette-colors</div><div class="desc">A named <code>palette</code>, accent-by-index, and a literal <code>#hex</code> override.</div></a>
-    <a class="card" href="branded/index.html" target="fvp"><div class="name">branded</div><div class="desc">A registered theme pack (<code>diagram … corporate</code>) re-skins the whole diagram. Ships dark/light/corporate.</div></a>
+    <a class="card" href="palette-colors/index.html" target="fvp"><div class="name">palette-colors</div><div class="desc">Colour tokens (<code>#sky</code>) + the theme ramp by index (<code>#series0</code>) that map per theme.</div></a>
+    <a class="card" href="branded/index.html" target="fvp"><div class="name">branded</div><div class="desc">A registered theme pack (<code>diagram … light</code>) re-skins the whole diagram. Ships dark/light; register your own.</div></a>
 
     <p class="docs">Docs: <a href="../docs/API.md" target="_blank">API.md</a> ·
       <a href="../docs/AI-AUTHORING.md" target="_blank">AI-AUTHORING.md</a> ·

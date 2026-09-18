@@ -8,7 +8,7 @@ Goal: an agent produces a complete, correct diagram in one pass. Read this with 
 
 A diagram has two halves, **both authored in `.flow`, with zero JavaScript**:
 
-1. **Structure** — `diagram`, `palette`, `lane`/`rail`, `node`, `edge`(`->`)/`road`(`~>`), `zone`.
+1. **Structure** — `diagram`, `lane`/`rail`, `node`, `edge`(`->`)/`road`(`~>`), `zone`.
 2. **Behaviour** — `flow` (packets on routes), hop `{ actions }`, `every` (periodics), `on`/`after`
    (events), `mode` (toggles), `seed` (determinism).
 3. **Controls** (optional) — a `controls` line auto-renders a play/pause · reset · speed bar; each
@@ -45,9 +45,14 @@ Expression built-ins: `rand()`, `mode(<name>)`, `dirty(<name>)`. Operators: `+ -
 - **Hops:** `~0.5` is the seconds for a hop. **Weights:** `@0.8`. **Forks:** `|` (pick one) or `&`
   (fan-out to all) — never both in one route.
 - **Booleans are bare flags:** `node x pipeline boxed vertical` — **not** `boxed:true`.
-- **Palette:** define `palette s = #.. #.. #..`, reference by index `accent:s0`; a literal `accent:#ff0`
-  overrides. An out-of-range ref (`s9`) throws.
-- **Comments:** `#` only, to end of line.
+- **Colours (`#` sigil):** put a **keyless `#token`** on any element — `node q core #sky`, `road a ~> b #emerald`,
+  `flow f #rose : …`. Tokens (`#emerald #sky #violet #amber #rose #mint #lime #azure #bronze`), the ramp by index
+  `#series0..2`, and roles `#text`/`#muted`/`#accent` **map per theme**; a literal `#hex` and a CSS name
+  `#steelblue` stay fixed. A colour without `#` errors; an unknown token (`#skyy`) throws. (The keyed forms
+  `accent:`/`color:` still parse.) Every kind has a themed **default**, so colours are optional; recolour a whole
+  kind with **`colors box:#sky road:#emerald …`** (inline `#token` wins).
+- **Comments:** a comment starts at a **standalone `#`** — put a **space after the hash** (`node a box  # a note`).
+  A glued `#word` (`#sky`, `#5cb4ff`) is a colour, not a comment.
 - **Layout:** prefer `lane`/`rail` (no coordinates) for tidy rows/columns; give `x:`/`y:` only when you
   need an exact spot (e.g. a `ring` between two lanes). **Sizes are optional** — every kind has a
   sensible default; add `w:`/`h:` only to override.
@@ -70,7 +75,7 @@ rail r
 node x box  lane:a rail:r name:"A"
 node y core lane:b rail:r name:"B"
 edge x.out -> y.in
-flow f rate:0.8 : x ~0.9 y
+flow f rate:2 : x ~0.9 y
 ```
 
 ## Pitfalls (wrong → right)
@@ -118,10 +123,9 @@ These are the traps that actually bite. Each is enforced by a loud error or a do
 Build a complex diagram that combines **`mode` · `pick v in [list]` · hop actions · `drop if` ·
 store→ring binding · `every…per…when` · `after`/`on` events**.
 
-**1. Frame + palette + a toggle mode.**
+**1. Frame + a toggle mode.**
 ```flow
 diagram "Task queue with workers" 900x400 dark
-palette s = #5ef2a0 #5cb4ff #ff9db1
 mode surge: spawn x3           # while active, clients submit 3× faster
 ```
 
@@ -133,19 +137,19 @@ rail top 110
 rail mid 200
 rail bot 290
 
-node clientA box  lane:in  rail:top name:"client A" accent:s0
-node clientB box  lane:in  rail:bot name:"client B" accent:s0
-node queue   ring x:410 y:176 slots:10 label:"queue" color:s1
+node clientA box  lane:in  rail:top name:"client A" #emerald
+node clientB box  lane:in  rail:bot name:"client B" #emerald
+node queue   ring x:410 y:176 slots:10 label:"queue" #sky
 node worker  core lane:out rail:mid name:"worker" sub:"drains 1/step"
-edge clientA.out -> queue.in  alpha:0.18
-edge clientB.out -> queue.in  alpha:0.18
-edge queue.out   -> worker.in alpha:0.18
+edge clientA -> queue  alpha:0.18
+edge clientB -> queue  alpha:0.18
+edge queue   -> worker alpha:0.18
 ```
 
 **3. Behaviour.** One flow picks a client per step and enqueues (dropping when full); one periodic
 drains the worker and schedules an audit; one event handler tallies audits.
 ```flow
-flow submit rate:0.8 color:s0 pick c in [clientA, clientB] : {c} { count submitted } ~0.5 queue { drop if queue >= 10; push queue; count enqueued }
+flow submit rate:2 #emerald pick c in [clientA, clientB] : {c} { count submitted } ~0.5 queue { drop if queue >= 10; push queue; count enqueued }
 
 every 0.5 per _ in [0] when queue > 0 : drain queue; count done; after 0.2: audit
 on audit: count audited

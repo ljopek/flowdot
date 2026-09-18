@@ -1,6 +1,6 @@
 {
   "name": "flowdot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A tiny framework + language for animated architecture / data-flow diagrams on HTML canvas 2D.",
   "type": "commonjs",
   "private": false,

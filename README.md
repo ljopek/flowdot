@@ -1,5 +1,7 @@
 # Flowdot
 
+<img src="examples/assets/flowdot-logo.png" alt="Flowdot" width="180">
+
 A tiny, **zero-dependency** framework **and language** for **animated architecture / data-flow
 diagrams** on HTML canvas 2D — boxes, ring buffers, matrices, roads, and packets that flow along
 routes and keep one identity, so a dot never teleports or changes colour mid-air.

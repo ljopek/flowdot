@@ -12,9 +12,12 @@ source, so this catalogue can't drift out of date.
 
 | Message fragment | Trigger | Fix |
 |---|---|---|
-| `unknown statement "` | a line's first word is not a known statement | Use one of `flow diagram palette set lane rail zone node edge road flow mode seed behavior on every model import` (or `each`). |
+| `unknown statement "` | a line's first word is not a known statement | Use one of `flow diagram set lane rail zone node edge road flow colors note legend join mode seed behavior on every model import` (or `each`). |
+| `note must be ` | a `note` not shaped `note "text" -> <nodeId>` | Quote the text and point at a node: `note "5s window" -> enrich`. |
+| `legend must be ` | a `legend` not shaped `legend "label" #colour` | `legend "source" #sky` (one row per line). |
+| `join must be ` | a `join` not shaped `join <nodeId> : <inputA> <inputB> …` (needs ≥2 inputs) | `join gather : profile pricing` — a barrier node then its named inputs. |
 | `has no attribute "` | a misspelled/unknown key on a built-in kind | Check the [per-kind reference](API.md#per-kind-attribute-reference); the error lists the valid keys. |
-| `has no index ` | a palette ref index past the ramp (`series9` on a 3-colour palette) | Use an in-range index, or add more colours to the `palette`. |
+| `unknown colour "` | a colour token that is not a `#hex`, theme token, role, or CSS name (a typo like `#skyy`) | Use `#hex`, a theme token (`#sky`), a role, or a CSS colour name. |
 | `cannot iterate "` | an `each … in <x>` where `<x>` is neither a range nor a list | Use `each i in 0..3` or `each x in [a, b, c]`. |
 | `bad expression "` | a malformed `{expr}` / guard / RHS (or a **typo'd verb** in a `{ … }` block) | Fix the expression; if it was meant to be an action, start the block with a real verb. |
 | `unsupported flowdot version ` | `flowdot <n>` with a major this build does not support | Use `flowdot 1.x`, or upgrade the library to a build that supports the declared major. |
@@ -34,11 +37,15 @@ source, so this catalogue can't drift out of date.
 | `on must be ` | an `on` line missing `<event>[(params)]: <actions>` | `on audit: count audited`. |
 | `pick list must be a [bracket list]` | a `pick v in <x>` where `<x>` isn't an inline list | `pick c in [clientA, clientB]` (named `set` lists aren't supported here). |
 | `pick expects ` | a malformed `pick <var> in <list>` clause | `flow f … pick v in [a, b] : …`. |
+| `flow rate must be a positive number` | a `flow … rate:R` whose R isn't a positive number (`rate:0`, `rate:-1`, `rate:fast`) | Use a positive number — rate is **packets per second** (`rate:2` = 2/s). |
 | `flow route must start with a node` | a `flow … : ~0.5 b` beginning with a hop | Start the route with a node id: `flow … : a ~0.5 b`. |
 | `a flow branch cannot mix ` | a route mixing `|` and `&` | Use only one fork kind per route (all `|` **or** all `&`). |
 | `a flow branch needs a node to branch from` | a `|`/`&` with no prefix node | Give the fork a node to branch from: `a ~0.5 hub ~0.5 x | ~0.5 y`. |
 | `branch option must be "~dur node [@weight]"` | a fork option missing its `~dur` or node | Each option is `~dur node [@weight] [{actions}]`. |
-| `a branch option must be "~dur node [@weight] [{actions}]"` | a fork option with extra tokens | Keep each option to one hop (+ optional weight/actions). |
+| `a branch option must be "~dur node [@weight] [{actions}]"` | a fork option with extra tokens | Keep each option to one hop (+ optional weight/guard/actions). |
+| `when needs a condition` | a branch `when` with no expression after it | `~0.5 review when amt > 5`. |
+| `when is only valid on a ` | a `when` guard on a plain (non-fork) route | Guards route a `\|` pick; use `drop if` on a linear hop instead. |
+| `when guards are only for a ` | a `when` guard on a `&` fan-out option | Fan-out copies to every branch; guards only choose in a `\|` pick. |
 | `expected "~dur" before ` | two nodes in a route with no `~dur` between | Put a hop duration between nodes: `a ~0.5 b`. |
 | `"~dur" without a node` | a `~dur` at the end of a route with nothing after | Follow every `~dur` with a node. |
 | `spawn route must start with a node` | a `spawn` action route starting with a hop | `spawn server ~0.5 client`. |
@@ -46,6 +53,9 @@ source, so this catalogue can't drift out of date.
 | `spawn "~dur" without a node` | a trailing `~dur` in a spawn route | Follow the `~dur` with a node. |
 | `spawn expected "~dur" before ` | two spawn-route nodes with no `~dur` | `spawn a ~0.4 b`. |
 | `needs "` | an `edge`/`road` missing its arrow | `edge a -> b` (connector) or `road a ~> b` (channel). |
+| `road width must be a positive number` | a `road` whose `width:` isn't a positive number (`width:0`, `width:-4`, `width:fat`) | Use a positive number, e.g. `road a ~> b width:12`. |
+| `colors expects "<kind>:#colour"` | a `colors` statement token without a `kind:#colour` pair | `colors box:#sky road:#emerald`. |
+| `colors has no kind "` | a `colors` override for a non-overridable kind (`matrix`, `flow`) or a typo | Use `box core ring pipeline zone road edge` (matrix uses `colColors`). |
 
 ## Runtime — expressions & state (`src/flow.js` · `src/flowdot.js`)
 
@@ -66,6 +76,8 @@ source, so this catalogue can't drift out of date.
 | `references unknown lane "` | `node … lane:<id>` with no matching `lane` | Use one of the declared lanes the message lists, or add `lane <id>`. |
 | `references unknown rail "` | `node … rail:<id>` with no matching `rail` | Use one of the declared rails the message lists, or add `rail <id>`. |
 | `references unknown node "` | a `flow` route names a node that doesn't exist | Fix the id, or add the `node`. |
+| `join references unknown node "` | a `join` barrier names a node that doesn't exist | Point the join at a real node id, or add the `node`. |
+| `references unknown input "` | a `join`'s named input is not a declared node | Fix the input id, or add the missing `node`. |
 | `needs a model` | a `call` with no `model` declared | Add `model "./m.js"` (or pass `ctx.model`) — Tier-2 only. |
 | `model has no function "` | `call fn(…)` where the model has no `fn` | Export `fn` from the model module. |
 | `Flowdot.mount: missing source` | `mount(target)` with no `.flow` text / IR | Pass the source: `mount('#c', text)`. |
