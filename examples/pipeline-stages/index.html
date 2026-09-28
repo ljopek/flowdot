@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — pipeline traversal</title>
+<!-- A packet that WALKS a pipeline's stages instead of the stages blinking beside it. The hop sugar
+     `feed ~> ingest.stages ~> sink` expands into one sub-leg per stage, so the dot visibly traverses
+     decode → canonicalise → offer — the work being done. ZERO authored JavaScript. Opens file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — pipeline traversal</h1>
+  <p class="sub">route a packet <b>through</b> a pipeline's stages with the <code>~&gt;
+    node.stages</code> sugar: <code>feed ~&gt; ingest.stages ~&gt; sink</code> expands into one hop per
+    stage, so the dot walks <code>decode → canonicalise → offer</code> — not a decorative blink.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "pipeline traversal — the dot walks each stage (no JS)" 720x220
+
+node feed   box      x:24  y:84 w:110 h:48 name:"feed" inspect:"<b>feed</b> — emits a packet into the pipeline"
+node ingest pipeline x:190 y:70 w:360 h:80 boxed name:"ingest" stages:["decode","canonicalise","offer"] inspect:"<b>ingest</b> — three stages; the packet routes <b>through</b> them (decode → canonicalise → offer), a sub-leg each"
+node sink   core     x:600 y:84 w:96  h:48 name:"sink" inspect:"<b>sink</b> — receives the offered packet"
+
+edge feed   -> ingest alpha:0.3
+edge ingest -> sink   alpha:0.3
+
+# `ingest.stages` expands into feed→stage:0→stage:1→stage:2→sink; the ~0.6 hop dur is split per stage.
+flow f rate:0.7 : feed ~0.5 ingest.stages ~0.6 sink
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

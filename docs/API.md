@@ -1,481 +1,395 @@
-# Flowdot API reference
+# Flowdot API
 
-Three entry points, one IR at the centre. In the browser, `<script>` tags expose the globals
-`Flowdot`, `SceneBuilder`, `Flow`. In node, `require('flowdot')` returns all three merged.
+This file lists the supported DSL and JavaScript API.
 
-```
-const { Diagram, Box, RingBuffer, FlowRuntime, Rng, SceneBuilder, Flow } = require('flowdot');
-```
+See the [guide](GUIDE.md) for concepts and examples.
 
----
+## File rules
 
-## `Flowdot` (src/flowdot.js) — the renderer
+- Use one statement per line.
+- Use two or more spaces for an `each` body.
+- Use `key:value` for attributes.
+- Quote text that contains spaces.
+- Use `[a, b, "c d"]` for a list.
+- Use `#sky`, `#series0`, or `#5cb4ff` for a color.
+- Start a comment with `#` followed by a space.
 
-### `new Diagram(canvas, spec)`
-The shell: owns the canvas (device-pixel-ratio aware), the animation loop, hit-testing, the
-inspector, and layered overlays.
-- `spec`: `{ width, height, theme?, onUpdate?(dt, now), background?(g, env), title?, subtitle? }`
-- `.add(component)` → component · `.addZone(zone)` · `.addRoad(channel)` · `.connector(from, to, opts)` → Connector
-- `.overlay(fn)` — add a draw layer `fn(g, env)` · `.inspector(el, defaultHTML)` — hover text target
-- `.start()` · `.stop()` (cancel the RAF loop) · `.dispose()` (stop + drop canvas listeners) · `.paused` · `.setSpeed(x)` · `.now` (seconds) · `.flow` (a FlowSystem)
-- `env` passed to draw hooks: `{ now, dt, theme, flow, diagram }`
+`flowdot 1` is an optional version marker. The current format is `1.0`.
 
-### Components (all extend `Component`)
-A **port** is the contract: `component.port(name) → [x, y]`. Base ports: `center, in/left, out/right,
-top, bottom`.
+`set` and `each` expand before parsing. Use `{name}`, `{list[i]}`, or `{1+i}` inside the repeated
+lines. Repeats can be nested.
 
-| Class | spec highlights | extra ports / methods |
-|---|---|---|
-| `Box` | `name, sub, accent` | — |
-| `Core` | `name, accent, lit` | double-border "pinned" look |
-| `RingBuffer` | `slots, r, color, label` | `push() drain(n) surge(a)`, `.fill/.overruns/.lapping`; ports `in, center` |
-| `Matrix` | `rows, cols, cw, ch, gap, colColors, rowLabels, colLabels, title, subtitle, cellNote(i,j)` | `write(i,j,{value,bid,ask,fresh,down}) cell(i,j) decay(dt,rate) setDown(j,b) highlightRow(i,now)`; ports `cell:i:j, rowRight:i, rowLeft:i, colTop:j` |
-| `Pipeline` | `stages[], vertical, boxed, pinned, name, accent, nodeR, pad, step, idle` | `pulse(now)`; ports `in, out, stage:k` |
-| `Zone` | `label, tint, accent` | a labelled background layer (added via `addZone`) |
-| `Channel` | `from, to, roadW, color, label` | a fat animated "road" (added via `addRoad`) |
-| `Connector` | via `diagram.connector(from,to,opts)` | `pulse(now)`; `opts: {c, alpha, dash, pulseColor}` |
+## Top-level statements
 
-A port ref (in connectors, channels, flow legs) is `[component, portName]`, `[x, y]`, or `() => [x,y]`
-— resolved live each frame, so moving a component moves everything wired to it.
-
-### `FlowSystem` (`diagram.flow`)
-Packets that travel a **route of legs**, each packet keeping one identity (never teleports).
-- `spawn(route, { style, data })` where a leg is `{ from, to, dur, style?, onArrive?(packet) }`
-- pure `update(dt)`, `draw(g)`, `.size`
-
-### `new FlowRuntime()` — temporal control (discrete-event core)
-Chainable; `update(dt, now)` runs five phases in a fixed order (sources → onFrame → timers →
-periodics → afterFrame).
-- `.source({ interval:()=>s, guard?:()=>bool, fire:()=>void })` — rate-driven emitter
-- `.after(delay, fn)` — schedule a callback · `.timerBudget(()=>n)` — cap timers fired per update
-- `.every({ items, interval:(it,i)=>s, when?:(it,i)=>bool, fire:(it,i)=>void })` — per-entity periodic
-- `.onFrame(fn)` / `.afterFrame(fn)` — host per-frame escapes
-
-### `Rng(seed)` — seedable PRNG (mulberry32)
-`rng()` → `[0,1)`; `rng.int(n)`, `rng.range(lo,hi)`, `rng.pick(arr)`. A fixed seed makes an
-animation reproducible frame-for-frame.
-
-### `Theme`, `Tween`, `Draw`
-`Theme` — colours by role (`bg, panel, line, text, muted, hot, bad, accent, series[]`) plus a `colors`
-token map (`emerald, sky, violet, amber, rose, mint, lime, azure, bronze`). `resolveColor(value, theme)`
-maps a `#`-sigil colour against a theme (`#token`/`#role`/`#series<N>` map; `#hex`/`#css-name` literal).
-`Tween` — `ease, lerp, lerpPt, mix, clamp01` (pure). `Draw` — `roundRect, box, text, glow, link`.
-
----
-
-## `SceneBuilder` (src/scene.js) — the IR builder
-
-`build(ir, diagram) → { diagram, byId, edgesById }`. The IR is a plain object:
-
-```js
-{
-  lanes: [ { id, x?, w? } ],            // optional layout columns (bare → auto-distributed)
-  rails: [ { id, y? } ],                // optional layout rows    (bare → auto-distributed)
-  zones: [ { id, ...ZoneSpec } ],
-  nodes: [ { id, kind, ...spec } ],     // kind ∈ box|core|ring|matrix|pipeline|zone + registered
-  edges: [ { id?, kind?:'road', from, to, style?, ...ChannelSpec } ],
-}
-```
-- `register(kind, (id, spec) => Component)` — teach it a custom component kind.
-- Edge refs `[nodeId, port]` resolve to the built component; `[x,y]` / functions pass through.
-- Edges with an `id` are returned in `edgesById` so a simulation can `pulse()` them.
-
-### Auto-layout — `resolveLayout(ir)`
-Run automatically at the start of `build`. A node may carry `lane` (an `id` into `ir.lanes`) and/or
-`rail` (an `id` into `ir.rails`) instead of `x/y`:
-- **lane** → horizontal: fills the lane if `w` is omitted, else aligns `left|center|right` (`align`,
-  default `center`) with a margin (`inset`, default 12).
-- **rail** → vertical: centres the node on the rail's `y`.
-- **Bare tracks auto-distribute** (GraphViz-lite, deterministic). A `lane` with no `x`/`w` splits the
-  diagram width into even columns; a `rail` with no `y` becomes an even horizontal band (one rail →
-  centred). The outer pad and inter-lane gap are `SceneBuilder.layoutDefaults` (`{ pad: 24, gap: 24 }`).
-- **Auto-stacking — the non-overlap guarantee.** Several nodes in one lane with no rail (and no `y`)
-  spread evenly *down* the lane (a lone one centres); the transpose holds for nodes on one rail with no
-  lane, which spread *across* it. Declaration order fixes the position, so it stays deterministic.
-- An explicit `x`, `y`, or `w` always wins **per field** — auto-layout only fills a coordinate left
-  blank, so mixed (some placed, some auto) diagrams work. A node with neither `lane` nor `rail` is
-  untouched; an unknown lane/rail throws. Pure — exposed as `SceneBuilder.resolveLayout(ir)` for testing.
-
-### Behaviour from text — `buildFlows(ir, ctx)`
-`ir.flows` (from the `.flow` `flow` statement) compile into a `FlowRuntime`:
-`buildFlows(ir, { byId, diagram, rng? }) → FlowRuntime`. Each flow spawns a packet that travels its
-node route at its rate (auto-pulsing arrivals, budget-guarded); drive it with
-`diagram.onUpdate = (dt, now) => rt.update(dt, now)`. Mount a whole `.flow` diagram with:
-```js
-const ir = Flow.parse(text);
-const { byId } = SceneBuilder.build(ir, diagram);
-const rt = SceneBuilder.buildFlows(ir, { byId, diagram, rng });  // rng optional (weighted picks)
-diagram.onUpdate = (dt, now) => rt.update(dt, now);
-```
-A flow may end in a **fork** off its last route node:
-- **pick** (`f.fork.mode === 'pick'`) — spawn one packet down a **weighted-random** branch. `ctx.rng`
-  (a `()=>[0,1)`, default `Math.random`; pass `Flowdot.Rng(seed)` for reproducibility) picks it.
-- **fan-out** (`mode === 'all'`) — spawn a packet to **every** branch, splitting at the branch node.
-
-See `examples/flow-pick` and `examples/flow-fanout` for each, authored entirely in `.flow`.
-
-### Batteries-included — `Flowdot.mount` / `Flowdot.boot` (src/mount.js)
-The whole `parse → Diagram → build → buildFlows → onUpdate → start` sequence collapses into one call:
-```js
-const { ir, diagram, rt, byId, dispose } = Flowdot.mount(target, source, opts);
-// dispose() — stop the loop, drop canvas listeners, and neutralize the runtime (no callback fires
-// afterward). The prerequisite for live-editing: re-mount into the same canvas without leaking
-// timers/RAF/listeners. Idempotent.
-```
-- **`target`** — a `Diagram`-like object (used as-is), a `<canvas>` element, or a selector string.
-- **`source`** — `.flow` text, or an already-parsed IR object.
-- **`opts`** — `{ seed?, rng?, diagram?:extraDiagramOpts, autoStart?:true, showSource?, safe? }`. `safe:true`
-  disables the Tier-2 `model`/`call`/`import` escapes (see [Security](#security--safe-mode--the-trust-model)); `seed`
-  (number or `"0x…"`) seeds `Flowdot.Rng` for reproducible weighted picks; `autoStart:false` builds
-  without starting the loop; **`showSource`** (a selector or element) mirrors the raw `.flow` text
-  into that element — the "view the source" panel demos used to wire by hand (skipped when `source`
-  is already an IR).
-
-**Zero-JS auto-boot.** On load, `Flowdot.boot()` mounts every opted-in source — no script needed:
-```html
-<script type="text/flow" data-flowdot data-seed="0x51F0" data-source="#echo"> …diagram source… </script>
-<script src="flowdot.js"></script><script src="scene.js"></script>
-<script src="flow.js"></script><script src="mount.js"></script>
-```
-It inserts a `<canvas>` after each marked source and mounts it (handle stashed on `canvas.__flowdot`).
-`data-seed` seeds the PRNG; `data-source="#sel"` fills that element with the source (a zero-JS
-"view the source" panel). Further **opt-in library controls** (each also renders zero-JS from the marker
-or a source line): `data-controls` / a `controls` line → a play/pause·reset·speed transport bar;
-`data-export` → a save-PNG button; `data-theme-toggle` / a `theme-toggle` line → a **dark↔light toggle**
-button (shows the active theme; a click re-mounts the source with the theme flipped). See `examples/theme-light`.
-The `data-flowdot` marker is **opt-in**, so a page with its own bespoke mount is never double-mounted.
-`boot(root?, mountFn?)` is parameterisable for testing. See `examples/auto-layout` (zero-JS auto-boot)
-and `examples/hello-world` (the smallest zero-JS diagram).
-
----
-
-## `Flow` (src/flow.js) — the `.flow` structure language
-
-`parse(text) → ir` (feed straight to `SceneBuilder.build`). Line-oriented, `#` comments.
-
-```flow
-diagram "Title" 1200x600 dark
-set feeds = Alpha Beta Gamma
-rails = 150 320 490
-each f in 0..2:
-  node src{f} pipeline x:44 y:{rails[f]} w:150 h:96 name:"{feeds[f]}" #series{f} boxed vertical stages:[decode, transform, emit]
-  road src{f} ~> hub{f} #series{f} width:14 label:"link {7001+f}"
-  edge hub{f} -> grid.colTop:{f} alpha:0.18
-zone sources "Sources" x:14 y:60 w:206 h:520
-```
-- **Statements:** `flow · diagram · set · lane · rail · zone · node · edge (->) · road (~>) · flow · colors · import`.
-- **Version & compatibility:** the format is **semver'd** — this build is **`flowdot 1.0`**. A source may
-  declare `flowdot <version>` (e.g. `flowdot 1`) as the first statement; it records `ir.version` and **throws
-  on an unsupported major** (`this build supports flowdot 1.x`). Policy: a **minor** bump is additive /
-  backward-compatible (new statements/attributes; old sources keep working); a **major** bump is
-  breaking. The pragma is optional — omit it and a source is parsed as current. (`Flow.SPEC_VERSION` /
-  `Flow.SPEC_MAJOR` expose the supported version.)
-- **Modules:** `import "<path.flow>"` inlines a shared source (a node/theme library) before parsing.
-  Resolution: `Flow.parse(text, { base, resolveImport })` — under node, files resolve via `fs` relative to
-  `base` (the importing file's dir); in the browser, supply `resolveImport(path, base) → text` (parsing is
-  synchronous, so fetch/preload the imports first). Cycles and missing files throw; **safe mode disables it**.
-- **Layout:** `lane <id> [x:.. w:..]` and `rail <id> [<y>|y:..]` — coordinates are optional; a bare
-  `lane l` / `rail r` auto-distributes into even columns/rows. A node then places with
-  `lane:<id> rail:<id>` (+ optional `align:left|center|right`, `inset:N`) instead of `x/y`; several
-  nodes in a lane with no rail auto-stack down it (and the transpose across a shared rail).
-- **Behaviour:** `flow · mode · seed · behavior · on · every · model` and hop `{ actions }` — the
-  full temporal language, specified in **[The `.flow` behaviour block](#the-flow-behaviour-block)** below.
-- **Values coerce:** `12`→number, `#…`→colour token, `[a, b, "c d"]`→array
-  (comma/space-separated, elements coerce), `"x"`→string (quotes are *always* literal),
-  a bare token on a node → boolean flag (`boxed`, `vertical`, `pinned`). (`|` means *only* the flow pick — see Behaviour.)
-- **Colours:** every colour carries a **`#` sigil** and is one of: a **`#hex`** (literal), a **theme token**
-  (`#sky`, `#emerald` — MAPS per theme), a **`#series<N>`** ramp index (maps), a **role** (`#text`, `#muted`,
-  `#accent` — maps), or a **CSS/PlantUML name** (`#steelblue` — literal). A token/name that resolves to nothing
-  (a typo like `#skyy`) **throws** at build (`unknown colour`). See [`examples/swatches`](../examples/swatches/index.html)
-  for every predefined colour.
-  - **One spelling — a bare `#token`:** on any element line, a keyless `#token` **is** its colour — `node q core #sky`,
-    `road a ~> b #emerald`, `flow f #rose : …`. It maps to that kind's colour (box/core/pipeline/zone border,
-    ring/road/flow fill, edge line). The older keyed forms (`accent:#sky`, `color:#emerald`, `colColors:[…]`,
-    `tint:`, edge `c:`) still parse. **Comment caveat:** a comment starts at a **standalone `#`** (`… # note` —
-    put a space after the hash); a glued `#word` is read as a colour.
-  - **Per-kind defaults:** every kind has a themed default colour, so a diagram that names **no** colours still
-    renders fully themed. Override a whole kind for the diagram with **`colors <kind>:#tok …`** (kinds:
-    `box core ring pipeline zone road edge`), layered over the theme — see [`examples/recolor`](../examples/recolor/index.html).
-  - **Resolution order** (most specific first): inline `#token` on the element → the diagram's `colors` per-kind
-    override → the theme's per-kind default → the theme role. Overrides are stored raw, so they **re-map when the
-    theme flips**.
-- **Roads:** `road a ~> b` draws a fat animated channel; **`width:N`** sets its stroke (default 16); `#token`
-  sets its colour. (`width` must be a positive number.)
-- **Edges:** `edge a -> b` draws a thin connector. Attributes (an unknown one **throws** — no silent-swallow):
-  `label:"…"` (a chip at the midpoint), `dashed` (a bare flag — async/lossy), `alpha:0..1` (opacity),
-  `#token` colour (→ the line, e.g. `#rose` for an error path), `dash:[on,off]`, `pulseColor:#…`, `lw:N`.
-- **Themes:** `diagram "T" WxH <theme>` selects a shipped scheme — **`dark`** (default) or **`light`** —
-  which re-skins the whole diagram (background, panels, lines, text, cell fills). Register
-  your own house style with `Flowdot.registerTheme(name, { bg, panel, line, text, accent, series:[…], … })`
-  (a named theme overlays the default, so it may be partial). Every draw reads the resolved `env.theme`, so a
-  scheme recolours *all* built-in kinds. See [`examples/branded`](../examples/branded/index.html)
-  and [`examples/theme-light`](../examples/theme-light/index.html) (light).
-- **Comprehensions:** `each VAR in 0..N` / `each VAR in <list>` (indent-delimited, nestable),
-  `{expr}` interpolation with numbers, bound vars, `list[i]`, and `+ - * / %`.
-- **Refs:** `id`, `id.port`, or `x,y`; a bare id defaults to `.out` (from) / `.in` (to) — so `edge a -> b`
-  is `a.out -> b.in` (out on the right, in on the left). Name a port (`a.top`, `grid.rowRight:2`, `pipe.join`)
-  only to override this for non-left-to-right layouts.
-- **Auto-edges:** an `auto-edges` line draws a faint connector under every `flow` route hop (incl. `|` pick
-  and `&` fan-out branches) automatically, so you can drop the duplicated `edge a -> b` lines — the flow
-  route already declares the topology. An explicit `edge`/`road` between a pair still wins (keeps its style);
-  templated hops (`worker{f}`) are skipped. Off unless opted in, so existing diagrams are unchanged.
-
----
-
-## The `.flow` behaviour block
-
-Everything above is **structure**. Behaviour — how packets move and how named state changes over time
-— is also authored in `.flow`, with **zero JavaScript**, and compiled by `SceneBuilder.buildFlows`
-(or `Flowdot.mount`, which calls it). This is the animated-diagram half that PlantUML/Mermaid lack.
-
-### Behaviour statements
-
-| Statement | Form | Meaning |
-|---|---|---|
-| `seed` | `seed 42` · `seed 0x51F0` | seed the runtime RNG (reproducible `pick` / `rand()`); decimal or hex |
-| `behavior` | `behavior` · `behavior seed:42` | optional section header; may carry `seed:` inline |
-| `mode` | `mode storm: spawn x4` | a togglable mode (below); `boot()` auto-renders a toggle button per mode |
-| `flow` | `flow <id> rate:R [color:C r:N max:M] [pick …] : <route>` | emits a packet along a route at **R packets/second** (`interval = 1/R`, R > 0; below) |
-| `on` | `on <event>[(p1,p2)]: <actions>` | a named event handler, fired by `after … : <event>` (or `rt.emit`) |
-| `every` | `every <seconds> per <v> in [list] [when <cond>]: <actions>` | a per-entity periodic: fires for each element **every N seconds** (a period, *not* a per-second rate) while the guard holds |
-| `model` | `model "./m.js"` · `model MyGlobal` | Tier-2 host escape — names a companion module for `call` (node `require` / browser global) |
-| `join` | `join <node> : <inputA> <inputB> …` | fan-in **barrier** — the node fires only once **every** named input has arrived (≥2 inputs); the dual of a `&` fan-out |
-
-**Modes.** `mode <name>: <effect>[; <effect>]`. Effects: `spawn xN` → while the mode is active every
-flow source fires **N× faster** (`op:'rate'`). `tier>=k drain xM` parses to a `drainMul` effect
-(reserved; not yet wired to periodics). Toggle at runtime with `rt.setMode(name, on)` / read with the
-`mode(name)` expression built-in.
-
-**Timing model — three distinct knobs.** `flow … rate:R` is a **frequency**: R packets per **second**
-(`rate:2` = 2/s, `rate:0.1` = 1 per 10s; `interval = 1/R`, and R must be > 0 or it throws). `every N …`
-is a **period**: it fires every **N seconds** (`every 0.5` = twice a second) — despite the shape, it is
-*not* a per-second rate. `mode … spawn xN` is a **multiplier**: while active it speeds every flow source
-**×N**. `~dur` on a hop is the seconds that hop takes. These are the only timing controls.
-
-### Routes, hops, forks
-
-A **route** is a chain of nodes joined by `~dur` hops (seconds): `A ~0.6 B ~0.5 C`.
-
-- **On-arrival actions.** Any node may carry a `{ … }` action block run when a packet arrives there;
-  actions on the **first** node run at packet birth: `A { count sent } ~0.5 B { push q; count in }`.
-- **Forks.** A route may end in **one** fork off its last node (options are homogeneous):
-  - weighted **pick** `|`: `… ~0.5 ok @0.75 | ~0.5 fail @0.25` — exactly one branch per packet, chosen by `@weight` (default 1).
-  - **guarded pick** `| when`: `… ~0.5 review when amt>5 | ~0.5 auto` — **deterministic, content-based**
-    routing: the packet takes the **first** branch whose `when <cond>` predicate holds (reusing the
-    `when`/`drop if` expression grammar, so pick vars / store / `rand()` are in scope); an **unguarded**
-    branch is the else/default. Guards are `|`-only (not `&`), and replace weighting when present.
-  - **fan-out** `&`: `… ~0.5 a & ~0.5 b & ~0.5 c` — a copy to **every** branch.
-  - a fork option may also carry `{ actions }`: `… ok @0.7 { spawn s ~0.4 c } | ~0.5 fail { after 0.6: retry }`.
-- **Per-fire entity pick.** `pick v in [list]` (before the `:`) binds `v` to a random list element each
-  time the flow fires; reference it as `{v}` in a route node id — e.g. `flow f pick p in [p1, p2] : {p} …`
-  makes a randomly-chosen producer the origin. Multiple: `pick f in [..], p in [..]`.
-- **Fan-in / join (barrier).** The **dual** of a `&` fan-out: `join <node> : <inputA> <inputB> …`
-  (a top-level statement, ≥2 inputs) makes `<node>` a barrier — a packet arriving from a named input
-  **parks silently** until every named input has arrived, and only then does the node pulse and run its
-  arrival actions (scatter-gather, stream join, enrichment, quorum). Arrivals are deduped by input id and
-  the barrier resets after each complete set. Route the inputs into the join node with ordinary flows
-  (`flow a … : … ~0.5 gather`); an unknown join node or input throws a located build error.
-
-### Actions — the closed verb vocabulary
-
-`;`-separated inside a hop `{ … }`, or after the `:` of `on` / `every`. An **unknown verb is a loud,
-located error**. `<target>` is a bare name (a store slot) or a dotted component path (see binding).
-
-| Verb | Meaning |
+| Statement | Form |
 |---|---|
-| `count <name>` | increment a named counter |
-| `set <name> = <expr>` | assign a named value |
-| `write <target> = <expr>` | latest-value write; overwriting a still-dirty cell tallies `superseded` (last-write-wins) |
-| `push <target>` / `drain <target>` | ring depth `++` / drain one |
-| `dirty <target>` / `clean <target>` | set / clear a cell's dirty flag |
-| `drop [if <cond>]` | terminate this packet — unconditionally, or when `cond` holds |
-| `after <D>: <event>` | schedule the named `<event>` `D` seconds later |
-| `spawn <route>` | emit a secondary packet along an inline **linear** route (no fork) |
-| `call [<name>=]<fn>(<args>)` | **Tier-2 only** — invoke `model.<fn>(args)`; optional `<name>=` stores the result |
+| Diagram | `diagram "Title" 800x400 dark` |
+| Version | `flowdot 1` |
+| Lane | `lane id [x:N] [w:N]` |
+| Rail | `rail id [y:N]` |
+| Node | `node id [kind] [attributes]` |
+| Zone | `zone id ["Label"] [attributes]` |
+| Edge | `edge from -> to [attributes]` |
+| Road | `road from ~> to [attributes]` |
+| Flow | `flow id rate:N [attributes] : route` |
+| Values | `set name = value...` |
+| Repeat | `each name in 0..3:` or `each name in [a,b]:` |
+| Controls | `controls` |
+| Theme switch | `theme-toggle` |
+| Derived edges | `auto-edges` |
+| Kind colors | `colors box:#sky edge:#muted` |
+| Seed | `seed 42` or `seed 0x2a` |
+| Event | `on name: actions` |
+| Periodic | `every seconds per item in list [when expression] : actions` |
+| Mode | `mode name: effects` |
+| Note | `note "Text" -> node` |
+| Legend | `legend "Text" #sky` |
+| Divider | `divider ["Text"] x1,y1 -> x2,y2 [#color] [solid]` |
+| Ghost | `ghost "Text" x,y [-> x2,y2] [#color]` |
+| Narration | `narrate seconds node... : "Text"` |
+| Join | `join node : inputA inputB...` |
+| Import | `import "file.flow"` |
+| Host model | `model "module"` or `model BrowserGlobal` |
 
-### Store → component binding
+`behavior seed:N` is an optional section marker. It does not create a block.
 
-State verbs update a small in-memory **store** (counters / values / cells / ring depths), readable in
-expressions. When `<target>` names a built-in component, the verb **also drives it on-canvas**:
+## Layout
 
-- `push` / `drain <ringId>` → a `RingBuffer`'s fill (a live queue depth). In an expression a bound ring
-  id reads its live `fill` (so `drop if queue >= 12` / `when queue > 0` see the true depth).
-- `write` / `dirty` / `clean <matrixId.i.j>` → that `Matrix` cell's value + freshness. Values are
-  numeric/expressions (the expression grammar has no string literals).
+Bare lanes become equal columns. Bare rails become equal rows.
 
-Unbound names touch only the store. Inspect it at runtime via `canvas.__flowdot.rt.store`.
+A node can use `lane:id`, `rail:id`, coordinates, or both. Explicit values win.
 
-### Expressions
+Nodes with the same lane and no rail stack vertically. Nodes with the same rail and no lane
+spread horizontally. Declaration order sets their order.
 
-Used in `drop if`, `when <cond>`, the RHS of `set`/`write`, `call` args, and `{expr}` interpolation:
+A `lane:` or `rail:` reference creates a missing track. Declare tracks when their order matters.
 
-- numbers, names, `name[idx]`, `( )`, `+ - * / %`, unary `-` and `!`
-- comparisons `== != < <= > >=`, boolean `&& ||`
-- built-ins: **`rand()`** (seeded `[0,1)`), **`mode(<name>)`** (is a mode active?), **`dirty(<name>)`** (is a cell dirty?)
+A zone can span one or more lanes and rails.
 
-### Sigils
+### Default sizes and spacing
 
-| Sigil | Meaning |
+A node with no `w`/`h` takes its kind's default size: `box` 140×56, `core` 160×60, `slot` 120×56,
+`readout` 120×60, `pipeline` 150×72, `ring` 48 tall (square from its radius). Auto-layout keeps a
+24px canvas margin and a 24px gap between tracks; a bare column of slots is 200px wide, a bare row
+120px tall. Size the canvas to fit: a row of N default boxes needs roughly `N*140 + (N+1)*24` px of
+width. Run `flowdot lint` to catch nodes that overlap or leave the canvas.
+
+## References and ports
+
+- `node` means the node's default port.
+- `node.out` and `node.in` select named ports.
+- `120,80` is a fixed point.
+- All nodes have `center`, `in`, `out`, `left`, `right`, `top`, and `bottom`.
+- A matrix also has `cell:i:j`, `rowLeft:i`, `rowRight:i`, and `colTop:j`.
+- A pipeline also has `stage:i` and `stages`.
+
+## Edges and roads
+
+Edge attributes:
+
+- `label:"Text"`
+- `alpha:N`
+- `dashed` or `dash:[on,off]`
+- `lw:N`
+- `pulseColor:#color`
+- `route:ortho` or `route:elbow`
+- `id:name`
+- a bare `#color`
+
+Road attributes are `id`, `label`, `width`, `route`, and a bare color. The default width is 16.
+
+Orthogonal routing changes the drawn connection. Moving packets still travel directly between
+ports.
+
+## Flow routes
+
+```text
+flow id rate:2 #sky r:4 max:100 : a ~0.4 b ~0.6 c
+```
+
+- `rate` is packets per animation second. It defaults to 1 and must be positive when set.
+- `~N` is a hop duration in animation seconds.
+- `r` is packet radius.
+- `max` stops new emissions while the diagram has that many active packets.
+- A bare color sets the packet color.
+- `pick v in [a,b]` binds a random value for one emission.
+
+A route can end with one branch group:
+
+```text
+# weighted choice
+a ~0.4 hub ~0.5 ok @0.8 | ~0.5 failed @0.2
+
+# guarded choice
+a ~0.4 hub ~0.5 large when amount > 10 | ~0.5 normal
+
+# fan-out
+a ~0.4 hub ~0.5 left & ~0.5 right
+```
+
+A branch can have a color and actions. For example:
+
+```text
+~0.5 failed @0.2 #rose { count failures }
+```
+
+## Actions
+
+Actions are separated by semicolons.
+
+| Action | Effect |
 |---|---|
-| `#` | comment to end of line |
-| `->` · `~>` | edge (`Connector`) · road (`Channel`) |
-| `~d` | hop duration, seconds |
-| `@w` | pick-branch weight |
-| `\|` · `&` | weighted-pick · fan-out fork |
-| `{ verb … }` | on-arrival action block (verb-led) |
-| `{ expr }` | interpolation — arithmetic, `list[i]`, bound vars, ramp index |
-| `#sky` · `#series0` | colour token · theme-ramp index (both map per theme) |
+| `count name` | Add one to a counter. |
+| `set name = expr` | Set a value. |
+| `write target = expr` | Write a latest value and mark it dirty. |
+| `push ring` | Add one item to a ring. |
+| `drain ring` | Remove one item from a ring. |
+| `dirty target` | Mark a value unread. |
+| `clean target` | Mark a value read. |
+| `drop [if expr]` | Stop the packet. |
+| `after N: event` | Emit an event later. |
+| `spawn a ~N b` | Start a linear packet route. |
+| `highlight grid.row:i` | Highlight one matrix row. |
+| `down grid.col:j` | Mark one matrix column down. |
+| `up grid.col:j` | Restore one matrix column. |
+| `surge ring [= N]` | Add several items to a ring. |
+| `snapshot grid[.row:i]` | Highlight a grid or row read. |
+| `call [name=]fn(args)` | Call the trusted host model. |
 
-**Worked, zero-JS examples:** browse the [example gallery](../examples/index.html) — one feature per
-example, grouped by category (structure · layout · behaviour · controls · theming), each rendered live
-with its `.flow` source. Every feature also has a minimal snippet in [`HOWTO.md`](HOWTO.md).
+Actions at the first route node run when the packet starts. Other actions run on arrival.
 
----
+## Expressions
 
-## Per-kind attribute reference
+Expressions support:
 
-Every `node <id> [<kind>] …` / `zone …` attribute the parser accepts, per built-in kind.
-The kind is **optional** — it defaults to `box`. Omit it when the next token is a `key:value`
-attribute or a bare `#colour`: `node producer lane:src #sky` parses as `kind='box'`. A **misspelled
-or unknown key on a built-in kind is a loud, located error** (listing the valid keys) — this table is
-the closed set. Custom (registered) kinds are not validated. Types: `num`, `str`, `bool`, `colour`
-(a `#`-sigil value: `#hex`, a theme token like `#sky`, a role like `#muted`, or a CSS name like `#steelblue`), `id` (a lane/rail id), `list` (a `[bracket list]`), `fn` (a template
-`(i,j)=>…`). This section is kept in lock-step with the parser schema by a parity test
-(`src/kind-schema.test.js`).
+- numbers and names
+- `name[index]`
+- `+ - * / %`
+- `== != < <= > >=`
+- `&& || !`
+- parentheses
+- `rand()`
+- `mode(name)`
+- `dirty(name)`
+- `now()`
+
+Expressions do not support string literals, objects, or user functions.
+
+## Events, periodics, and modes
+
+`on name: actions` registers a synchronous named event. Emit it with `view.rt.emit(name, data)`.
+Payload fields are visible as expression names.
+
+`every N per item in list when condition: actions` runs once per item after each period.
+
+Mode effects are separated by semicolons:
+
+- `spawn x2`
+- `down grid.col:1` or `up grid.col:1`
+- `surge ring = 4`
+- `decay grid x2`
+
+Toggle a mode with `view.rt.setMode(name, true)`.
+
+## Node attributes
+
+The kind defaults to `box`. Give the kind, when set, as the first token after the id — before any
+flags or `key:value` attributes (`node q ring slots:16`, not `node q slots:16 ring`). Unknown
+attributes on built-in kinds are errors.
 
 ### Common node attributes
 
-Accepted by `box`, `core`, `ring`, `matrix`, `pipeline` (a `zone` accepts only `x y w h inspect
-hoverable` from this set — not `align/inset`; it has its own `lane/lanes/rail/rails` for inferring its
-box, see the `zone` table below).
-
-| key | type | default | notes |
-|---|---|---|---|
-| `x` | num | `0` (or kind/lane) | absolute x; a `lane` or the kind default supplies it if omitted |
-| `y` | num | `0` (or rail) | absolute y; a `rail` centres it if omitted |
-| `w` | num | kind default / lane-fill | box 140 · core 160 · pipeline 150 · ring label-aware · matrix computed |
-| `h` | num | kind default / rail | box 56 · core 60 · pipeline 72 · ring 48 · matrix computed |
-| `lane` | id | — | place in an `ir.lanes` column instead of giving `x` |
-| `rail` | id | — | place on an `ir.rails` row instead of giving `y` |
-| `align` | str | `center` | `left\|center\|right` within a lane |
-| `inset` | num | `12` | lane margin |
-| `inspect` | str \| fn | — | hover-inspector text (string or `(now)=>string`) |
-| `hoverable` | bool | `true` | participates in hit-testing (`zone` defaults `false`) |
+| key | meaning |
+|---|---|
+| `x` | Left position. |
+| `y` | Top position. |
+| `w` | Width. |
+| `h` | Height. |
+| `inspect` | Hover text or trusted function. |
+| `hoverable` | Enable hit testing. |
+| `lane` | Lane ID. |
+| `rail` | Rail ID. |
+| `align` | `left`, `center`, or `right` in a lane. |
+| `inset` | Lane margin. |
+| `decay` | Activity fade per second. |
 
 ### box
 
-| key | type | default | notes |
-|---|---|---|---|
-| `name` | str | the node id | label drawn in the box |
-| `sub` | str | — | a smaller subtitle line under the name |
-| `accent` | colour | theme line | border/label colour |
+| key | meaning |
+|---|---|
+| `name` | Label. |
+| `sub` | Subtitle. |
+| `accent` | Accent color. |
 
 ### core
 
-Like `box` (pinned double-border look), plus:
+| key | meaning |
+|---|---|
+| `name` | Label. |
+| `sub` | Subtitle. |
+| `accent` | Accent color. |
+| `lit` | Bright inner border. |
+| `idle` | Calm lit state. |
+| `owns` | Ownership label. |
 
-| key | type | default | notes |
-|---|---|---|---|
-| `name` | str | the node id | label |
-| `sub` | str | — | subtitle line |
-| `accent` | colour | theme line | inner-border/label colour |
-| `lit` | bool | `true` | inner border lit (on) vs dimmed (off) |
+### slot
+
+| key | meaning |
+|---|---|
+| `name` | Label. |
+| `accent` | Accent color. |
+| `value` | Initial value. |
+
+### readout
+
+| key | meaning |
+|---|---|
+| `watch` | Store key or component property. |
+| `name` | Alias for `watch`. |
+| `label` | Caption. |
+| `unit` | Value suffix. |
+| `accent` | Accent color. |
+| `value` | Initial number. |
 
 ### ring
 
-| key | type | default | notes |
-|---|---|---|---|
-| `slots` | num | `12` | ring capacity (dots around the circle) |
-| `r` | num | `16` | circle radius |
-| `color` | colour | theme hot | slot/label colour (turns red when lapping) |
-| `label` | str | — | side label; widens the reserved box so rings never overlap |
+| key | meaning |
+|---|---|
+| `slots` | Capacity. Default: 12. |
+| `r` | Radius. Default: 16. |
+| `color` | Color. |
+| `label` | Side label. |
 
 ### matrix
 
-| key | type | default | notes |
-|---|---|---|---|
-| `rows` | num | required | grid rows |
-| `cols` | num | required | grid columns |
-| `cw` | num | `76` | cell width |
-| `ch` | num | `56` | cell height |
-| `gap` | num | `4` | gap between cells |
-| `colColors` | list | theme series | per-column accent colours |
-| `rowLabels` | list | `[]` | left-side row labels |
-| `colLabels` | list | `[]` | top column labels |
-| `title` | str | `"Matrix"` | title above the grid |
-| `subtitle` | str | `""` | subtitle beside the title |
-| `cellNote` | fn | — | `(i,j)=>string` note drawn in each cell |
+| key | meaning |
+|---|---|
+| `rows` | Row count. |
+| `cols` | Column count. |
+| `cw` | Cell width. |
+| `ch` | Cell height. |
+| `gap` | Cell gap. |
+| `colColors` | Column colors. |
+| `rowLabels` | Row labels. |
+| `colLabels` | Column labels. |
+| `title` | Title. |
+| `subtitle` | Subtitle. |
+| `cellNote` | Trusted `(row,col)=>text` function. |
 
 ### pipeline
 
-| key | type | default | notes |
-|---|---|---|---|
-| `stages` | list | `[a, b]` | the stage-node labels, lit in sequence on pulse |
-| `nodeR` | num | `15` | stage-node radius |
-| `idle` | bool | `false` | render dimmed (a busy-spinning worker) |
-| `vertical` | bool | `false` | stack stages vertically (label to the right) |
-| `boxed` | bool | `false` | wrap the stages in a container box |
-| `pinned` | bool | `false` | boxed double-border (a pinned thread) |
-| `name` | str | — | container label (with `boxed`) |
-| `accent` | colour | theme accent | container/first-stage colour |
-| `pad` | num | `118` (v: `36`) | offset of the first stage from the box |
-| `step` | num | `70` (v: `24`) | spacing between stages |
+| key | meaning |
+|---|---|
+| `stages` | Stage labels. |
+| `nodeR` | Stage radius. |
+| `idle` | Dim stages. |
+| `vertical` | Stack stages. |
+| `boxed` | Draw a container. |
+| `pinned` | Draw a double border. |
+| `name` | Container label. |
+| `accent` | Accent color. |
+| `pad` | First-stage offset. |
+| `step` | Stage spacing. |
 
 ### zone
 
-A labelled background band (added behind the nodes). Accepts `x y w h inspect hoverable` (above; note
-`hoverable` defaults **`false`**), plus:
+| key | meaning |
+|---|---|
+| `label` | Label. |
+| `tint` | Fill color. |
+| `accent` | Border color. |
+| `lane` | Span one lane. |
+| `lanes` | Span several lanes. |
+| `rail` | Span one rail. |
+| `rails` | Span several rails. |
 
-| key | type | default | notes |
-|---|---|---|---|
-| `label` | str | `""` | band label (top-left) |
-| `tint` | colour | subtle blue | fill tint |
-| `accent` | colour | theme line | dashed border colour |
-| `lane` | id | — | span this lane's column — the zone **infers** `x`/`w` from it (explicit `x`/`w` still win) |
-| `lanes` | list | — | span several lanes: `lanes:[fe, be]` → `x`/`w` cover their union |
-| `rail` | id | — | span this rail's row — infers `y`/`h` (explicit wins); with no rail, a lane-zone gets a full-height band |
-| `rails` | list | — | span several rails: `rails:[top, bot]` → `y`/`h` cover their vertical extent |
+A zone also accepts `x`, `y`, `w`, `h`, `inspect`, and `hoverable`.
 
-### edge (`->`, a `Connector`)
+## Mount API
 
-`edge a -> b …` / an auto-derived connector. An unknown key **throws** (no silent-swallow).
+```js
+const view = Flowdot.mount(target, source, options);
+```
 
-| key | type | default | notes |
-|---|---|---|---|
-| `label` | str | — | a chip drawn at the midpoint |
-| `alpha` | num | `0.18` (auto-derived `0.2`) | line opacity, `0..1` (`0` = invisible, `1` = solid) |
-| `dashed` | bool | `false` | bare flag → a default dash (async/lossy edge) |
-| `dash` | list | — | explicit `[on, off]` dash pattern |
-| `#token` | colour | theme `edge` | the line colour (e.g. `#rose` for an error path) |
-| `pulseColor` | colour | theme accent | the travelling-dot glow colour |
-| `lw` | num | `1.3` | line width |
+`target` is a canvas, selector, or Diagram-like object. `source` is DSL text or parsed IR.
 
-### road (`~>`, a `Channel`)
+Options:
 
-`road a ~> b …` — the fat animated channel packets ride. Honours **`width:N`** (stroke, default 16) and a
-`#token` colour; the edge keys above (incl. `alpha`) are accepted but only the `Connector` renders them.
+- `safe`: disable `import`, `model`, and `call`.
+- `seed` or `rng`: control random choices.
+- `autoStart:false`: build without starting animation.
+- `diagram`: extra `Diagram` options.
+- `showSource`: copy source into an element.
+- `base` and `resolveImport`: resolve trusted imports.
 
----
+The returned view has:
 
-## Security — safe mode & the trust model
+- `ir`: parsed scene data.
+- `diagram`: renderer and animation loop.
+- `rt`: behavior runtime and state store.
+- `byId`: components by node ID.
+- `edgesById`: named edges.
+- `theme`: resolved theme name.
+- `dispose()`: stop work and remove listeners.
 
-Almost all of `.flow` is inert: it describes shapes and packet motion, reading/writing only an in-memory
-store. **Three constructs are different** — they reach outside the diagram and are unsafe for untrusted
-input (a portal rendering user-submitted `.flow`, or a live-edited source):
+Useful methods:
 
-- `model "<path>"` / `call fn(…)` — the Tier-2 host escape (in node, `require`s a module and calls it).
-- `import "<path.flow>"` — a host-file include (inlines another source; reads a file / needs a resolver).
+- `view.rt.emit(name, payload)`
+- `view.rt.setMode(name, on)`
+- `view.rt.reset()`
+- `view.diagram.setPaused(on)`
+- `view.diagram.setSpeed(multiplier)`
+- `view.diagram.render()`
+- `view.diagram.start()` and `stop()`
 
-**Safe mode** disables all three. Pass `safe: true` to `Flow.parse(text, { safe })` or
-`Flowdot.mount(target, source, { safe })`; a source using a gated construct throws a clear, located
-`… is disabled in safe mode`. It is enforced at parse **and** (defence in depth) in `buildFlows`, so an
-IR handed in directly is gated too.
+`Flowdot.boot(root)` mounts each `script[type="text/flow"][data-flowdot]` element.
 
-**Defaults.**
-- `Flowdot.boot()` (the zero-JS embed/auto-mount path — the untrusted case) is **safe by default**. Opt
-  out per source with `data-unsafe` on the `<script type="text/flow">` (only for content you trust).
-- Direct `Flowdot.mount(...)` / `Flow.parse(...)` default to **safe: false** (a programmatic caller is
-  trusted); pass `safe: true` when rendering untrusted input.
+## Command line
 
-So a trusted, hand-authored page using its own `mount` keeps its Tier-2 `model`/`call`; a live-edited
-tutorial or an embedded user source cannot read or execute host code.
+The package installs a `flowdot` binary.
+
+```sh
+flowdot lint diagram.flow     # check syntax and layout; exit 0 clean, 1 on any error
+flowdot vendor ./assets       # copy dist/flowdot.js into ./assets for a static/file:// page
+```
+
+`lint` parses the file in safe mode and reports syntax and attribute errors with line numbers, then
+checks the resolved layout for degenerate sizes, off-canvas nodes, and node overlaps. It is the
+validate step of an author → lint → fix → render loop. `import`, `model`, and `call` are flagged in
+safe mode rather than run.
+
+## Lower-level API
+
+CommonJS exports all modules from one entry:
+
+```js
+const { Flow, SceneBuilder, Diagram, Rng } = require('flowdot');
+```
+
+- `Flow.parse(text, options)` returns IR.
+- `SceneBuilder.build(ir, diagram)` returns components and edges.
+- `SceneBuilder.buildFlows(ir, context)` returns a `FlowRuntime`.
+- `SceneBuilder.register(kind, factory)` adds a component kind.
+- `Flowdot.registerTheme(name, theme)` adds a theme.
+- `Rng(seed)` returns a repeatable random function.
+
+The renderer also exports its component classes and drawing helpers.
+
+## Safe mode
+
+`import`, `model`, and `call` can read files or run host code. Safe mode rejects them.
+
+Auto-boot uses safe mode unless the source element has `data-unsafe`. Direct `parse` and `mount`
+calls are trusted by default.
+
+## Current limits
+
+- Timing is illustrative. It is not an event simulator.
+- Reset does not restore every component, mode, or random state. Remount for a clean restart.
+- Event payloads are not copied. Do not mutate an object after `emit`.
+- Orthogonal edges do not change packet paths.
+- A join is a global visual barrier. It does not correlate requests.
+- Matrix age text is illustrative. It is not measured time.
+- Put `drop` after the source node. A source action cannot cancel its own emission.
+- Use positive hop durations and weights. Zero currently falls back to the default.
+- Give a guarded choice an unguarded fallback.

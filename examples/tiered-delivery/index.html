@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — coloured delivery</title>
+<!-- Spawned/periodic packets can carry their own colour. A `#token` on a `spawn` (or on the spawn
+     inside an `every`) sets the delivery dot's colour, so each tier's dot matches its subscriber
+     instead of every packet being stuck on one hot colour. ZERO authored JavaScript. Opens file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — coloured delivery</h1>
+  <p class="sub">a <code>#token</code> on a <code>spawn</code> colours the spawned packet. Three
+    <code>every … : spawn … #seriesN</code> timers deliver at their own rate, each dot matching its
+    tier — not all stuck on one colour.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "coloured delivery — spawned dots match their tier (no JS)" 720x300
+
+node hub core x:60  y:120 w:130 h:56 name:"publisher" inspect:"<b>publisher</b> — fans a tick out to three tiers, each delivered at its own rate and colour"
+node s0  box  x:520 y:44  w:160 h:44 #series0 name:"fast" inspect:"<b>fast</b> — a delivery every 0.5s (tier colour #series0)"
+node s1  box  x:520 y:128 w:160 h:44 #series1 name:"mid"  inspect:"<b>mid</b> — a delivery every 1s (tier colour #series1)"
+node s2  box  x:520 y:212 w:160 h:44 #series2 name:"slow" inspect:"<b>slow</b> — a delivery every 2s (tier colour #series2)"
+
+edge hub -> s0 alpha:0.3
+edge hub -> s1 alpha:0.3
+edge hub -> s2 alpha:0.3
+
+# each timer spawns a delivery packet coloured to match its tier — the #token rides on the spawn.
+every 0.5 per _ in [0] : spawn hub ~0.6 s0 #series0
+every 1   per _ in [0] : spawn hub ~0.6 s1 #series1
+every 2   per _ in [0] : spawn hub ~0.6 s2 #series2
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

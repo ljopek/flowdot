@@ -40,6 +40,13 @@ canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-
   padding:5px 14px;font:inherit;font-size:12px;cursor:pointer;
   box-sizing:border-box;min-width:128px;text-align:center}   /* fixed width so "Theme: dark"↔"Theme: light" doesn't resize */
 .flow-themebtn:hover{border-color:var(--hot)}
+/* the library inserts <div class="flow-ghost"> with a counterfactual-layer toggle when opted in (data-ghost-toggle / any `ghost` line) */
+.flow-ghost{display:flex;gap:8px;margin:10px 0}
+.flow-ghostbtn{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:7px;
+  padding:5px 14px;font:inherit;font-size:12px;cursor:pointer;
+  box-sizing:border-box;min-width:110px;text-align:center}   /* fixed width so "Ghost: off"↔"Ghost: on" doesn't resize */
+.flow-ghostbtn:hover{border-color:var(--hot)}
+.flow-ghostbtn.on{border-color:var(--hot);color:var(--hot)}
 /* hover inspector: [data-flow-inspector] is wired by boot() to show the hovered node's inspect text */
 .inspector{color:var(--muted);margin:8px 0 0;font-size:12px;min-height:1.5em}
 .inspector b{color:var(--fg)}

@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — colour swatches (every predefined token &amp; role)</title>
+<!-- ZERO authored JavaScript. A reference chart: one swatch per PREDEFINED colour — the theme tokens
+     (#emerald…#bronze), the semantic roles (#text…#white) and the #series ramp. Each swatch is a box
+     whose border IS the colour; every colour is a `#` token that MAPS per theme, so the dark↔light
+     toggle re-colours the whole chart. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>colour swatches — the predefined palette</h1>
+  <p class="sub">Every colour you can name without a <code>#hex</code>: the theme <b>tokens</b> (<code>#emerald</code> … <code>#bronze</code>), the semantic <b>roles</b> (<code>#text</code> … <code>#white</code>), and the <code>#series0…2</code> ramp. Each swatch's border <b>is</b> the colour — all are <code>#</code> tokens that <b>map per theme</b>, so click the toggle to re-map the whole chart.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-editable data-source="#src">
+diagram "Predefined colours — tokens, roles & the series ramp" 1040x340
+# a zero-JS dark↔light toggle appears under the canvas — flip it and every swatch re-maps.
+theme-toggle
+
+# three bare rails (auto-distributed into rows); swatches auto-spread across each row — no coordinates.
+rail tokens
+rail roles
+rail ramp
+
+# theme colour TOKENS — the author-facing palette; each maps to a per-theme value.
+node c_emerald box rail:tokens w:96 h:40 name:"#emerald" #emerald
+node c_sky     box rail:tokens w:96 h:40 name:"#sky"     #sky
+node c_violet  box rail:tokens w:96 h:40 name:"#violet"  #violet
+node c_amber   box rail:tokens w:96 h:40 name:"#amber"   #amber
+node c_rose    box rail:tokens w:96 h:40 name:"#rose"    #rose
+node c_mint    box rail:tokens w:96 h:40 name:"#mint"    #mint
+node c_lime    box rail:tokens w:96 h:40 name:"#lime"    #lime
+node c_azure   box rail:tokens w:96 h:40 name:"#azure"   #azure
+node c_bronze  box rail:tokens w:96 h:40 name:"#bronze"  #bronze
+
+# semantic ROLES — the structural colours the themes are built from (also map per theme).
+node r_text   box rail:roles w:96 h:40 name:"#text"   #text
+node r_muted  box rail:roles w:96 h:40 name:"#muted"  #muted
+node r_line   box rail:roles w:96 h:40 name:"#line"   #line
+node r_accent box rail:roles w:96 h:40 name:"#accent" #accent
+node r_hot    box rail:roles w:96 h:40 name:"#hot"    #hot
+node r_bad    box rail:roles w:96 h:40 name:"#bad"    #bad
+node r_idle   box rail:roles w:96 h:40 name:"#idle"   #idle
+node r_dim    box rail:roles w:96 h:40 name:"#dim"    #dim
+node r_white  box rail:roles w:96 h:40 name:"#white"  #white
+
+# the series RAMP — indexed colours (#series0…2) used by `each` loops.
+node s0 box rail:ramp w:96 h:40 name:"#series0" #series0
+node s1 box rail:ramp w:96 h:40 name:"#series1" #series1
+node s2 box rail:ramp w:96 h:40 name:"#series2" #series2
+  </script>
+
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — packet payload (pick)</title>
+<!-- A flow packet that carries a per-fire value. `pick i in [0,1,2]` binds a fresh `i` each time the
+     flow fires, and the hop action `write grid.{i}.0` uses it to light ONE cell (row i) instead of the
+     whole column. With `decay:` the cell fades again — a live matrix from pure .flow. `seed` makes the
+     picks reproducible. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — packet payload (pick)</h1>
+  <p class="sub"><code>pick i in [0,1,2]</code> binds a per-fire value the hop action can use:
+    <code>write grid.{i}.0</code> lights <b>one</b> cell (row <code>i</code>) per tick, not the whole
+    column. <code>decay:</code> fades it; <code>seed</code> makes the picks reproducible.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "packet payload — one pick lights one cell (no JS)" 640x300
+seed 7
+
+node feed box x:34 y:120 w:120 h:48 name:"ticks" inspect:"<b>ticks</b> — each fire picks one instrument <code>i</code> and writes only that cell"
+node grid matrix x:250 y:56 w:156 h:176 rows:3 cols:2 decay:0.5 title:"cache" subtitle:"pick i → write cell (i, 0)" inspect:"<b>cache</b> — one write per tick lights row <code>i</code> of column 0, then decays back to idle"
+
+edge feed -> grid alpha:0.3
+
+# pick binds i per fire; {i} interpolates into the write target so one tick lights exactly one cell.
+flow f rate:2.2 pick i in [0,1,2] : feed ~0.5 grid { write grid.{i}.0 = 1 }
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

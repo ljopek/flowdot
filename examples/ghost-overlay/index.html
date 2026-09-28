@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — ghost / counterfactual overlay</title>
+<!-- A `ghost "caption" x,y [-> x2,y2] [#colour]` line declares a COUNTERFACTUAL annotation — "what the
+     naïve alternative would cost" (GC debt, a pointer chase, a blocking queue). Ghosts form a toggleable
+     layer that is HIDDEN by default; the library auto-renders a "Ghost: off/on" button (any `ghost` line
+     opts in) that flips the layer — no re-mount, no authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — ghost / counterfactual overlay</h1>
+  <p class="sub">A <code>ghost "caption" x,y</code> line declares a <b>counterfactual</b> annotation — the
+    cost of the naïve alternative. Ghosts are a <b>toggleable layer, hidden by default</b>; the library
+    auto-renders a <b>Ghost: off/on</b> button that shows/hides them. Click it — the dim, dashed "what a
+    naïve impl would cost" notes fade in over the real diagram. No host JS.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-ghost-toggle data-editable data-source="#src">
+diagram "the real path — toggle the ghosts to see the naïve cost" 720x360
+
+node src   core x:40  y:150 w:120 h:56 name:"source"  inspect:"<b>source</b> — emits into a preallocated ring"
+node ring  ring x:280 y:150 w:120 h:56 label:"ring"    inspect:"<b>ring</b> — a lock-free SPSC buffer, zero allocation"
+node sink  box  x:540 y:150 w:120 h:48 name:"consumer" inspect:"<b>consumer</b> — drains without blocking"
+
+edge src -> ring alpha:0.5
+edge ring -> sink alpha:0.5
+flow f rate:1.6 : src ~0.6 ring { push ring } ~0.6 sink { drain ring }
+
+# the ghost layer — the naïve alternative, hidden until you toggle it on
+ghost "naïve: new Message() per op → GC debt" 280,60 #rose
+ghost "naïve: pointer-chase linked list" 280,270 -> 460,270
+ghost "naïve: blocking queue → consumer stalls" 540,90 #amber
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

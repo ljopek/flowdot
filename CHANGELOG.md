@@ -1,23 +1,12 @@
 # Changelog
 
-All notable changes to Flowdot. Format loosely follows [Keep a Changelog](https://keepachangelog.com/);
-this project uses [semver](https://semver.org/).
+## 0.8.0
 
-## 0.6.0 — Initial public release
+- The documentation now has one guide and one API reference.
+- Added `flowdot lint <file.flow>`: checks syntax and layout (overlaps, off-canvas, degenerate size).
+- Example pages now load the shared `dist/flowdot.min.js` bundle instead of inlining the library.
+- Documented the node kind position rule and default node sizes and spacing.
 
-- Zero-dependency framework **and language** (`.flow`) for animated architecture / data-flow diagrams on
-  HTML canvas 2D.
-- **Structure:** `node` / `edge` (`->`) / `road` (`~>`) / `lane` / `rail` / `zone`, with coordinate-free
-  lane × rail auto-layout.
-- **Behaviour:** `flow` routes with per-hop `{ actions }` (the closed verb set), weighted `pick` (`|`) and
-  fan-out (`&`), `spawn`, `after`/`on` events, `every … per … when` periodics, and a `seed` for
-  determinism.
-- **Comprehensions:** `set` / `each … in` / `{expr}` interpolation.
-- **Theming:** named palettes and registered theme packs (dark / light / corporate).
-- **Controls (zero-JS):** a `controls` line auto-renders a play/pause · reset · speed bar; each `mode`
-  renders a toggle button.
-- **Distribution:** a UMD browser bundle (`dist/flowdot.js`) and an ESM build (`dist/flowdot.mjs`);
-  works via `<script>` / `file://`, bundler `import`, Node `require`, and CDN (unpkg / jsDelivr).
-- **Accessibility:** every canvas mount sets `role="img"` + an `aria-label`/text fallback and honours
-  `prefers-reduced-motion`.
-- MIT licensed.
+## 0.7.0
+
+- Added the current Flow DSL, renderer, host API, examples, and command-line tools.

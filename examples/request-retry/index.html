@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — request / retry</title>
+<!-- ZERO authored JavaScript. A complex tutorial combining four behaviour features: a weighted `pick`
+     (`|`) routes each request to ok|fail; the ok branch `spawn`s an ack back to the client; the fail
+     branch schedules `after 0.6: retry`; and `on retry` re-issues the request. `seed` makes the
+     ok/fail sequence reproducible. Covers pick + after + spawn + on/events. data-source mirrors the
+     source below. Opens file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>request / retry — pick, after, spawn, on</h1>
+  <p class="sub">~5% of requests are dropped client-side (<code>drop if rand() &lt; 0.05</code>); the rest are routed by a weighted <code>pick</code> to <b>ok</b> (75%) or <b>fail</b> (25%). On <b>ok</b> the server <code>spawn</code>s an ack back to the client; on <b>fail</b> it schedules <code>after 0.6: retry</code>, and <code>on retry</code> re-issues the request. <code>seed</code> makes it reproducible. Counts: <code>document.querySelector('canvas').__flowdot.rt.store</code>.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Request / retry" 880x360
+seed 0x2024
+
+lane cl
+lane sv
+lane rs
+
+rail top
+rail mid
+rail bot
+
+node client  lane:cl rail:mid inspect:"<b>client</b> — drops ~5% of requests; sends the rest to the server at rate:1"
+node server core lane:sv rail:mid sub:"75 / 25" inspect:"<b>server</b> — routes 75% to ok (spawns ack) or 25% to fail (schedules retry after 0.6s)"
+node ok      lane:rs rail:top #emerald inspect:"<b>ok</b> — success path (75%); server spawns an ack packet back to the client"
+node fail    lane:rs rail:bot #rose    inspect:"<b>fail</b> — failure path (25%); triggers a retry event 0.6s later via after"
+
+edge client -> server alpha:0.22
+edge server -> ok   alpha:0.16
+edge server -> fail alpha:0.16
+
+# each request travels client → server, where a weighted `pick` chooses one outcome:
+#   ok  (75%) → the server `spawn`s an ack packet back to the client, and tallies `ok`
+#   fail(25%) → schedule the `retry` event 0.6s later (via `after`), and tally `failed`
+flow req rate:1 : client { count requests; drop if rand() < 0.05 } ~0.6 server ~0.55 ok @0.75 { spawn server ~0.6 client; count ok } | ~0.55 fail @0.25 { after 0.6: retry; count failed }
+
+# the retry handler: fired 0.6s after a failure — re-issue the request (a fresh client → server packet)
+on retry: count retried; spawn client ~0.6 server
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

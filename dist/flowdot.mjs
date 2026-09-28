@@ -147,11 +147,34 @@ const globalThis = __ns;
     ease:t => (t = Tween.clamp01(t)) < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2,
     lerp:(a,b,t) => a + (b-a)*t,
     lerpPt:(p,q,t) => [p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t],
+    // Position at fraction t (0..1) along a polyline [[x,y],…] — used to animate a pulse along an
+    // orthogonal/elbow route (F11) the same way lerpPt animates it along a straight leg.
+    polyPt(pts, t){ if(pts.length<2) return pts[0]||[0,0];
+      const seg=[]; let total=0;
+      for(let i=1;i<pts.length;i++){ const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1];
+        const L=Math.hypot(dx,dy); seg.push(L); total+=L; }
+      if(total===0) return pts[0];
+      let d=Tween.clamp01(t)*total;
+      for(let i=0;i<seg.length;i++){ if(d<=seg[i]||i===seg.length-1) return Tween.lerpPt(pts[i],pts[i+1], seg[i]?d/seg[i]:0); d-=seg[i]; }
+      return pts[pts.length-1]; },
     mix(a,b,t){ const A=hex(a), B=hex(b);
       return `rgb(${(A[0]+(B[0]-A[0])*t)|0},${(A[1]+(B[1]-A[1])*t)|0},${(A[2]+(B[2]-A[2])*t)|0})`; }
   };
+  // F11 (opt-in): an orthogonal "elbow" path between two points — HVH through the horizontal midpoint
+  // when the run is mostly horizontal, else VHV through the vertical midpoint. Right-angle wires stop
+  // dense diagrams cutting diagonally across nodes. Returns the polyline points (straight stays default).
+  function orthoPts(x1,y1,x2,y2){
+    if(Math.abs(x2-x1) >= Math.abs(y2-y1)){ const mx=(x1+x2)/2; return [[x1,y1],[mx,y1],[mx,y2],[x2,y2]]; }
+    const my=(y1+y2)/2; return [[x1,y1],[x1,my],[x2,my],[x2,y2]];
+  }
   function hex(h){ h=h.replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join('');
     return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+
+  // Resolve a port reference to an [x,y] point. One of: ()=>[x,y] (a live getter), a literal [x,y]
+  // (two numbers), or [component, portName] (look up the named anchor). Shared by every kind that
+  // draws between two endpoints (Channel/Connector/FlowSystem) so the resolver lives in one place.
+  function portPt(ref){ if(typeof ref==='function') return ref();
+    if(ref.length===2 && typeof ref[0]==='number') return ref; return ref[0].port(ref[1]); }
 
   // ─────────────────────────────────────────────────────────── Draw (stateless ctx helpers)
   const Draw = {
@@ -175,7 +198,12 @@ const globalThis = __ns;
       g.fillStyle=color; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); },
     link(g,x1,y1,x2,y2,o){ o=o||{}; g.save(); g.globalAlpha=o.alpha==null?1:o.alpha;
       g.strokeStyle=o.c||Theme.line; g.lineWidth=o.lw||1.3; if(o.dash) g.setLineDash(o.dash);
-      g.beginPath(); g.moveTo(x1,y1); g.bezierCurveTo((x1+x2)/2,y1,(x1+x2)/2,y2,x2,y2); g.stroke(); g.restore(); }
+      g.beginPath(); g.moveTo(x1,y1); g.bezierCurveTo((x1+x2)/2,y1,(x1+x2)/2,y2,x2,y2); g.stroke(); g.restore(); },
+    // Stroke a polyline (F11 orthogonal/elbow routing) with the same options as link(); joins/caps
+    // rounded so the right-angle bends read cleanly.
+    polyline(g,pts,o){ o=o||{}; if(!pts||pts.length<2) return; g.save(); g.globalAlpha=o.alpha==null?1:o.alpha;
+      g.strokeStyle=o.c||Theme.line; g.lineWidth=o.lw||1.3; g.lineJoin='round'; g.lineCap='round'; if(o.dash) g.setLineDash(o.dash);
+      g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]); g.stroke(); g.restore(); }
   };
 
   // ─────────────────────────────────────────────────────────── Component base
@@ -185,7 +213,17 @@ const globalThis = __ns;
       this.inspect=spec.inspect||null;          // string | (now)=>string
       this.hoverable=spec.hoverable!==false;
       this.hovered=false;
+      // Per-node "activity energy" (F9): pulse/arrival bumps it to 1, update() decays it each frame.
+      // OPT-IN via `decay:` — with no decay rate a kind renders exactly as before (energy is ignored).
+      this.energy=0; this.decayRate=+spec.decay||0;
     }
+    // Arrival/pulse bump: mark the node active. Every kind gets this now (was Pipeline/Connector only);
+    // it sets pulseAt for kinds that read it and raises energy for the F9 glow (rendered only when opted in).
+    pulse(now){ this.pulseAt=now; this.energy=1; }
+    // Per-frame hook (Diagram's loop calls it on every component while not paused): fade energy to idle.
+    update(dt){ if(this.decayRate>0) this.energy=Math.max(0, this.energy - dt*this.decayRate); }
+    // Opacity that follows energy when a decay rate is set (idle→dim, active→full); 1 (no change) otherwise.
+    energyAlpha(){ return this.decayRate>0 ? 0.45 + 0.55*this.energy : 1; }
     bounds(){ return {x:this.x, y:this.y, w:this.w, h:this.h}; }
     contains(mx,my){ return mx>=this.x && mx<=this.x+this.w && my>=this.y && my<=this.y+this.h; }
     // Named anchor points. Subclasses extend; base offers the box anchors.
@@ -209,20 +247,86 @@ const globalThis = __ns;
       this.name=spec.name||id; this.sub=spec.sub||null; this.accent=spec.accent||null; }  // null → theme default at draw
     draw(g, env){
       const kc=themeKindColor(env.theme,'box',env.kindColors);
-      Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel, stroke:this.accent||kc, glow:this.hovered?env.theme.hot:null});
+      const active=this.decayRate>0;                              // F9: opt-in energy glow (idle→dim, active→lit)
+      if(active){ g.save(); g.globalAlpha=this.energyAlpha(); }
+      Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel, stroke:this.accent||kc,
+        glow:this.hovered?env.theme.hot:(active && this.energy>0.5 ? (this.accent||kc) : null)});
       Draw.text(g,this.name,this.x+this.w/2,this.y+this.h/2+(this.sub?-2:5),{c:this.accent||env.theme.text,size:13,align:'center',w:'600'});
       if(this.sub) Draw.text(g,this.sub,this.x+this.w/2,this.y+this.h/2+14,{c:env.theme.muted,size:10.5,align:'center'});
+      if(active) g.restore();
     }
   }
 
   // ─────────────────────────────────────────────────────────── Core (pinned, double border)
   class Core extends Box {
-    constructor(id, spec){ super(id, spec); this.lit=spec.lit!==false; }
+    constructor(id, spec){ super(id, spec); this.lit=spec.lit!==false;
+      // F13: a "lit-but-idle" pinned shard — `idle` renders the lit border at a calm resting intensity
+      // (owns-its-data, at rest) between bright-lit and off; `owns` draws a small caption ("owns P3").
+      this.idle=!!spec.idle; this.owns=(spec.owns!=null)?spec.owns:null; }
     draw(g, env){ const accent=this.accent||themeKindColor(env.theme,'core',env.kindColors);
-      Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel2,stroke:env.theme.line,r:9,glow:this.hovered?env.theme.hot:null});
-      g.save(); g.strokeStyle=this.lit?accent:env.theme.idle; g.globalAlpha=this.lit?0.9:0.5; g.lineWidth=1.4;
+      const active=this.decayRate>0;                              // F9: opt-in energy glow
+      if(active){ g.save(); g.globalAlpha=this.energyAlpha(); }
+      Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel2,stroke:env.theme.line,r:9,
+        glow:this.hovered?env.theme.hot:(active && this.energy>0.5 && !this.idle ? accent : null)});
+      // inner border: bright-lit (ready) · idle-but-lit (owns, at rest) · off (dim grey)
+      g.save(); g.strokeStyle=this.lit?accent:env.theme.idle; g.globalAlpha=this.lit?(this.idle?0.6:0.9):0.5; g.lineWidth=1.4;
       Draw.roundRect(g,this.x+3,this.y+3,this.w-6,this.h-6,7); g.stroke(); g.restore();
-      Draw.text(g,this.name,this.x+this.w/2,this.y+this.h/2+4,{c:this.hovered?env.theme.white:accent,align:'center',w:'600'});
+      const ny=this.owns!=null?this.y+this.h/2-4:this.y+this.h/2+4;
+      Draw.text(g,this.name,this.x+this.w/2,ny,{c:this.hovered?env.theme.white:accent,align:'center',w:'600'});
+      if(this.owns!=null) Draw.text(g,'owns '+this.owns,this.x+this.w/2,this.y+this.h/2+13,{c:env.theme.muted,size:9.5,align:'center'});
+      if(active) g.restore();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────── Slot (single last-value cell, F4)
+  // One conflation buffer per subscriber: holds the LAST value written, shows whether it is still
+  // PENDING (dirty, un-read) and FLASHES "superseded" when a new value overwrites an un-read one —
+  // the conflation moment (latest-wins). N slots side by side = a legible per-subscriber fanout,
+  // where a shared "fanout box" hid the overwrite-before-read. Driven from .flow via write/dirty/clean
+  // on the slot's own id (`write s1 = v` produces, `clean s1` = the subscriber read it).
+  class Slot extends Component {
+    constructor(id, spec){ super(id, spec);
+      this.name=spec.name||id; this.accent=spec.accent||null;   // null → theme default at draw
+      this.value=(spec.value!=null)?spec.value:null; this.dirty=false; this.supersededAt=-1; this.writes=0; }
+    // A new value arrives. Overwriting an un-read (dirty) value is a SUPERSEDE — flash it.
+    set(value, now){ if(this.dirty) this.supersededAt=(now==null?0:now); this.value=value; this.dirty=true; this.writes++; return this; }
+    mark(now){ if(this.dirty) this.supersededAt=(now==null?0:now); this.dirty=true; }   // dirty, no new value
+    read(){ this.dirty=false; return this.value; }                                       // subscriber drained it (clean)
+    draw(g, env){ const th=env.theme, accent=this.accent||themeKindColor(th,'box',env.kindColors);
+      const flash=this.supersededAt>=0 && env.now-this.supersededAt<0.5 ? 1-(env.now-this.supersededAt)/0.5 : 0;
+      Draw.box(g,this.x,this.y,this.w,this.h,{fill:th.panel,stroke:this.dirty?accent:th.line,
+        glow:this.hovered?th.hot:(flash>0?th.bad:(this.dirty?accent:null)),r:7});
+      Draw.text(g,this.name,this.x+9,this.y+14,{c:th.muted,size:10,w:'600'});
+      Draw.text(g,this.value==null?'—':String(this.value),this.x+this.w/2,this.y+this.h/2+9,
+        {c:this.dirty?(this.accent||th.text):th.muted,size:16,align:'center',w:'600'});
+      if(this.dirty && flash===0) Draw.glow(g,this.x+this.w-11,this.y+11,3,accent,0.9);   // pending (un-read) dot
+      if(flash>0){ g.save(); g.strokeStyle=th.bad; g.globalAlpha=0.9*flash; g.lineWidth=2.2;
+        Draw.roundRect(g,this.x-3,this.y-3,this.w+6,this.h+6,9); g.stroke();
+        Draw.text(g,'superseded',this.x+this.w/2,this.y+this.h-5,{c:th.bad,size:8.5,align:'center',w:'600'}); g.restore(); }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────── Readout (live store meter, F8)
+  // A telemetry tile: renders a LIVE number bound to a store key (`count`ed counter, `set` value,
+  // ring depth, `superseded`, or a dotted `comp.prop` like a ring's `overruns`). The store isn't in
+  // the draw env, so SceneBuilder wires `this.get` at buildFlows time; draw/update poll it and flash
+  // when the number changes. Without a behaviour block `get` stays null and it shows its initial value.
+  class Readout extends Component {
+    constructor(id, spec){ super(id, spec);
+      this.watch=spec.watch||spec.name||id;              // store key (or `comp.prop`) to display
+      this.label=spec.label||this.watch; this.unit=spec.unit||null; this.accent=spec.accent||null;
+      this.value=(spec.value!=null)?spec.value:0; this._bumpAt=-1; this.get=null; }
+    read(now){ if(this.get){ const v=this.get();
+      if(v!=null && v!==this.value){ this.value=v; if(now!=null) this._bumpAt=now; } } return this.value; }
+    update(dt, now){ super.update(dt); this.read(now); }
+    draw(g, env){ const th=env.theme, accent=this.accent||themeKindColor(th,'core',env.kindColors);
+      this.read(env.now);
+      const bump=this._bumpAt>=0 && env.now-this._bumpAt<0.35 ? 1-(env.now-this._bumpAt)/0.35 : 0;
+      Draw.box(g,this.x,this.y,this.w,this.h,{fill:th.panel2,stroke:bump>0?accent:th.line,
+        glow:this.hovered?th.hot:(bump>0?accent:null),r:7});
+      Draw.text(g,this.label,this.x+this.w/2,this.y+15,{c:th.muted,size:9.5,align:'center',w:'600'});
+      Draw.text(g,String(this.value)+(this.unit?' '+this.unit:''),this.x+this.w/2,this.y+this.h/2+13,
+        {c:accent,size:20,align:'center',w:'700'});
     }
   }
 
@@ -257,6 +361,10 @@ const globalThis = __ns;
     port(name){ const cy=this.y+this.h/2;
       if(name==='in') return [this.x, cy];
       if(name==='center') return [this._cx(), cy];
+      // `out` = the circle's right edge, so a ring sits INLINE in a flow (`a ~> ring ~> b`): a packet
+      // enters left, crosses the ring, and leaves the other side (F2). The base `out` was the box-right
+      // edge — for a labelled ring that lands past the side label, so the exit looked disconnected.
+      if(name==='out') return [this._cx()+this.r, cy];
       return super.port(name); }
     draw(g, env){
       const color=this.color||themeKindColor(env.theme,'ring',env.kindColors), cx=this._cx(), cy=this.y+this.h/2, col=this.lapping?env.theme.bad:color;
@@ -281,10 +389,15 @@ const globalThis = __ns;
       this.colColors=spec.colColors||null; this.rowLabels=spec.rowLabels||[]; this.colLabels=spec.colLabels||[];  // null → theme.series at draw
       this.title=spec.title||'Matrix'; this.subtitle=spec.subtitle||''; this.cellNote=spec.cellNote||null;
       this.w=this.cols*(this.cw+this.gap)-this.gap; this.h=this.rows*(this.ch+this.gap)-this.gap;
+      this.decayRate=+spec.decay||0;                             // declarative per-frame fade (F1); 0 = latch (prior behaviour)
       this.cells=[]; for(let i=0;i<this.rows;i++){ const r=[];
         for(let j=0;j<this.cols;j++) r.push({value:null, fresh:0, down:false}); this.cells.push(r); }
       this.hi={i:-1, at:-1};
+      this.snap=null;                                            // F18: {row:-1|i, at} — a bulk-read burst overlay
     }
+    // Per-frame hook (called by Diagram's loop while not paused): a matrix with `decay:` self-fades
+    // written cells back to idle, so `write id.i.j` from pure .flow doesn't latch ON forever.
+    update(dt){ if(this.decayRate>0) this.decay(dt, this.decayRate); }
     colX(j){ return this.x + j*(this.cw+this.gap); }
     rowY(i){ return this.y + i*(this.ch+this.gap); }
     cell(i,j){ return this.cells[i][j]; }
@@ -293,6 +406,14 @@ const globalThis = __ns;
     decay(dt,rate){ for(let i=0;i<this.rows;i++)for(let j=0;j<this.cols;j++){
       const c=this.cells[i][j]; c.fresh = c.down?0:Math.max(0,c.fresh-dt*rate); } }
     highlightRow(i,now){ this.hi={i, at:now}; }
+    // F18: read (visibly pull) many cells at once — a whole row (i≥0) or the WHOLE grid (i null/<0),
+    // for a late-join snapshot or a shard's whole-row read. Re-freshens each valued cell (the visible
+    // pull) and records a burst overlay; returns how many cells were pulled.
+    snapshot(row, now){ this.snap={ row:(row==null?-1:row), at:(now==null?0:now) };
+      const rows = row==null ? this.cells.map((_,i)=>i) : [row];
+      let n=0; for(const i of rows){ const r=this.cells[i]; if(!r) continue;
+        for(let j=0;j<this.cols;j++){ const c=r[j]; if(c.value!=null && !c.down){ c.fresh=1; n++; } } }
+      return n; }
     contains(mx,my){ return mx>=this.x-46 && mx<=this.x+this.w && my>=this.y-30 && my<=this.y+this.h; }
     port(name){ // 'cell:i:j' | 'rowRight:i' | 'rowLeft:i' | 'colTop:j'
       const p=name.split(':');
@@ -322,6 +443,12 @@ const globalThis = __ns;
       if(this.hi.at>=0 && env.now-this.hi.at<0.5){ const a=1-(env.now-this.hi.at)/0.5, ry=this.rowY(this.hi.i);
         g.save(); g.strokeStyle=env.theme.accent; g.globalAlpha=0.9*a; g.lineWidth=2.2;
         Draw.roundRect(g,this.colX(0)-3,ry-3,this.w+6,this.ch+6,8); g.stroke(); g.restore(); }
+      // F18: the snapshot burst — a white ring sweeping the whole grid (row<0) or one row, fading over 0.6s.
+      if(this.snap && env.now-this.snap.at<0.6){ const a=1-(env.now-this.snap.at)/0.6;
+        g.save(); g.strokeStyle=env.theme.white; g.globalAlpha=0.85*a; g.lineWidth=2.4;
+        if(this.snap.row<0) Draw.roundRect(g,this.x-4,this.y-4,this.w+8,this.h+8,10);
+        else { const ry=this.rowY(this.snap.row); Draw.roundRect(g,this.colX(0)-4,ry-4,this.w+8,this.ch+8,9); }
+        g.stroke(); g.restore(); }
     }
   }
 
@@ -342,12 +469,15 @@ const globalThis = __ns;
       this.pulseAt=-1; }
     nodeX(k){ return this.vertical ? this.x+24 : this.x+this.pad+k*this.step; }
     nodeY(k){ return this.vertical ? this.y+this.pad+k*this.step : this.y+this.h/2+4; }
-    pulse(now){ this.pulseAt=now; }
+    // pulse() is inherited from Component (sets pulseAt for the stage-lighting below + energy for F9).
     port(name){
-      if(this.vertical) return super.port(name);           // boxed step-stack: flow uses box edges
+      // stage:k resolves for both layouts (horizontal: x varies; vertical: y varies) so a flow can
+      // route THROUGH the stages (F3b `~> pipe.stages`). nodeY(k)==nodeY(0) when horizontal, so this
+      // is identical to the old horizontal behaviour.
+      const m=/^stage:(\d+)$/.exec(name); if(m) return [this.nodeX(+m[1]), this.nodeY(+m[1])];
+      if(this.vertical) return super.port(name);           // boxed step-stack: flow uses box edges for in/out
       if(name==='in'||name==='join') return [this.nodeX(0), this.nodeY(0)];
       if(name==='out') return [this.nodeX(this.stages.length-1), this.nodeY(0)];
-      const m=/^stage:(\d+)$/.exec(name); if(m) return [this.nodeX(+m[1]), this.nodeY(0)];
       return super.port(name); }
     draw(g, env){ const th=env.theme, accent=this.accent||themeKindColor(th,'pipeline',env.kindColors);
       if(this.boxed){ Draw.box(g,this.x,this.y,this.w,this.h,{fill:this.pinned?th.panel2:th.panel,stroke:accent,glow:this.hovered?th.hot:null,r:9});
@@ -387,10 +517,13 @@ const globalThis = __ns;
   class Channel extends Component {
     constructor(id, spec){ super(id, spec); this.from=spec.from; this.to=spec.to;
       this.roadW=spec.roadW||spec.width||16; this.color=spec.color||null; this.label=spec.label||null;  // `.flow` authors write width:; roadW is the IR name. null color → theme default at draw
+      this.route=spec.route||null;                                     // F11 opt-in: 'ortho'/'elbow' → right-angle road; else the default bezier
       this.hoverable=spec.hoverable!==false; }
-    _pt(ref){ if(typeof ref==='function') return ref();
-      if(ref.length===2 && typeof ref[0]==='number') return ref; return ref[0].port(ref[1]); }
+    _ortho(){ return this.route==='ortho'||this.route==='elbow'; }
+    _pt(ref){ return portPt(ref); }
     _path(g){ const a=this._pt(this.from), b=this._pt(this.to);
+      if(this._ortho()){ const pts=orthoPts(a[0],a[1],b[0],b[1]);
+        g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]); return [a,b]; }
       g.beginPath(); g.moveTo(a[0],a[1]); g.bezierCurveTo((a[0]+b[0])/2,a[1],(a[0]+b[0])/2,b[1],b[0],b[1]); return [a,b]; }
     contains(mx,my){ const a=this._pt(this.from), b=this._pt(this.to), r=this.roadW/2+4;
       return mx>=Math.min(a[0],b[0])-r && mx<=Math.max(a[0],b[0])+r && my>=Math.min(a[1],b[1])-r && my<=Math.max(a[1],b[1])+r; }
@@ -409,20 +542,21 @@ const globalThis = __ns;
   class Connector {
     constructor(from, to, opts){ this.from=from; this.to=to; this.opts=opts||{}; this.pulseAt=-1; }
     pulse(now){ this.pulseAt=now; }
-    _pt(ref){ // [component, portName] | [x,y] | ()=>[x,y]
-      if(typeof ref==='function') return ref();
-      if(ref.length===2 && typeof ref[0]==='number') return ref;
-      return ref[0].port(ref[1]); }
+    _pt(ref){ return portPt(ref); }   // [component, portName] | [x,y] | ()=>[x,y]
+    _ortho(){ const r=this.opts.route; return r==='ortho'||r==='elbow'; }   // F11 opt-in; straight (bezier) stays default
     draw(g, env){ const a=this._pt(this.from), b=this._pt(this.to);
       const dash=this.opts.dash||(this.opts.dashed?[5,4]:null);   // `dashed` flag → a default dash (async/lossy edge)
-      Draw.link(g,a[0],a[1],b[0],b[1],{c:this.opts.c||themeKindColor(env.theme,'edge',env.kindColors), alpha:this.opts.alpha==null?0.18:this.opts.alpha, dash});
+      const col=this.opts.c||themeKindColor(env.theme,'edge',env.kindColors), alpha=this.opts.alpha==null?0.18:this.opts.alpha;
+      const ortho=this._ortho(), pts=ortho?orthoPts(a[0],a[1],b[0],b[1]):null;
+      if(ortho) Draw.polyline(g,pts,{c:col,alpha,dash});
+      else Draw.link(g,a[0],a[1],b[0],b[1],{c:col,alpha,dash});
       if(this.opts.label){                                        // a documentation label on a chip at the edge midpoint
-        const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+        const mid=ortho?Tween.polyPt(pts,0.5):[(a[0]+b[0])/2,(a[1]+b[1])/2], mx=mid[0], my=mid[1];
         g.save(); g.font='10px ui-monospace,monospace'; const tw=g.measureText(this.opts.label).width;
         g.globalAlpha=0.9; g.fillStyle=env.theme.panel; Draw.roundRect(g,mx-tw/2-5,my-14,tw+10,16,4); g.fill(); g.globalAlpha=1;
         Draw.text(g,this.opts.label,mx,my-3,{c:env.theme.muted,size:10,align:'center'}); g.restore(); }
       if(this.pulseAt>=0 && env.now-this.pulseAt<0.45){ const t=Tween.ease((env.now-this.pulseAt)/0.45);
-        const p=Tween.lerpPt(a,b,t); Draw.glow(g,p[0],p[1],3.4,this.opts.pulseColor||env.theme.accent); } }
+        const p=ortho?Tween.polyPt(pts,t):Tween.lerpPt(a,b,t); Draw.glow(g,p[0],p[1],3.4,this.opts.pulseColor||env.theme.accent); } }
   }
 
   // A documentation callout: a text chip floated above a target component, tied to it by a leader line.
@@ -435,6 +569,39 @@ const globalThis = __ns;
       g.fillStyle=env.theme.panel2; Draw.roundRect(g,nx-tw/2-6,ty-9,tw+12,18,5); g.fill();          // chip
       g.strokeStyle=env.theme.line; g.lineWidth=1; Draw.roundRect(g,nx-tw/2-6,ty-9,tw+12,18,5); g.stroke();
       Draw.text(g,this.text,nx,ty+4,{c:env.theme.text,size:10,align:'center'}); g.restore(); }
+  }
+
+  // A free labelled divider / rule (F12): a standalone line for a process boundary or a hot/cold split,
+  // not tied to any node (that is what note/zone can't express). `divider "label" x1,y1 -> x2,y2`.
+  class Divider {
+    constructor(spec){ spec=spec||{};
+      this.x1=+spec.x1; this.y1=+spec.y1; this.x2=+spec.x2; this.y2=+spec.y2;
+      this.label=spec.label||null; this.color=spec.color||null; this.dashed=spec.dashed!==false; }
+    draw(g, env){ const c=this.color||env.theme.muted;
+      g.save(); g.strokeStyle=c; g.globalAlpha=0.6; g.lineWidth=1.4; if(this.dashed) g.setLineDash([6,5]);
+      g.beginPath(); g.moveTo(this.x1,this.y1); g.lineTo(this.x2,this.y2); g.stroke(); g.setLineDash([]); g.restore();
+      if(this.label){ const mx=(this.x1+this.x2)/2, my=(this.y1+this.y2)/2;
+        g.save(); g.font='10px ui-monospace,monospace'; const tw=g.measureText(this.label).width;
+        g.globalAlpha=0.94; g.fillStyle=env.theme.panel2; Draw.roundRect(g,mx-tw/2-6,my-9,tw+12,18,5); g.fill();
+        g.strokeStyle=c; g.globalAlpha=0.5; g.lineWidth=1; Draw.roundRect(g,mx-tw/2-6,my-9,tw+12,18,5); g.stroke(); g.globalAlpha=1;
+        Draw.text(g,this.label,mx,my+4,{c:env.theme.text,size:10,align:'center'}); g.restore(); } }
+  }
+
+  // A ghost / counterfactual annotation (F16): a DIM, italic, dashed callout ("what a naïve impl would
+  // cost" — GC debt, pointer-chase, a blocking queue). It's part of a toggleable layer (Diagram.ghostOn),
+  // HIDDEN by default; the scene registers one overlay that draws the ghosts only while the layer is on.
+  class Ghost {
+    constructor(spec){ spec=spec||{};
+      this.text=spec.text||''; this.x=+spec.x; this.y=+spec.y;
+      this.x2=(spec.x2!=null)?+spec.x2:null; this.y2=(spec.y2!=null)?+spec.y2:null; this.color=spec.color||null; }
+    draw(g, env){ const c=this.color||env.theme.muted;
+      g.save(); g.globalAlpha=0.42;                                 // dim — a faded counterfactual under the real diagram
+      if(this.x2!=null){ g.strokeStyle=c; g.lineWidth=1.4; g.setLineDash([2,4]);  // an optional ghost wire
+        g.beginPath(); g.moveTo(this.x,this.y); g.lineTo(this.x2,this.y2); g.stroke(); g.setLineDash([]); }
+      if(this.text){ g.font='italic 10px ui-monospace,monospace'; const tw=g.measureText(this.text).width;
+        g.strokeStyle=c; g.lineWidth=1; g.setLineDash([3,3]); Draw.roundRect(g,this.x-tw/2-6,this.y-9,tw+12,18,5); g.stroke(); g.setLineDash([]);
+        Draw.text(g,this.text,this.x,this.y+4,{c:c,size:10,align:'center'}); }
+      g.restore(); }
   }
 
   // Relative luminance (WCAG) of a #rrggbb — used to detect a light theme background so the flow dot
@@ -456,8 +623,7 @@ const globalThis = __ns;
         const leg=p.route[p.i]; p.t += dt/leg.dur;
         if(p.t>=1){ p.t=0; if(leg.onArrive) leg.onArrive(p); p.i++; if(p.i>=p.route.length) p.done=true; } }
       this.packets=this.packets.filter(p=>!p.done); }
-    _pt(ref){ if(typeof ref==='function') return ref();
-      if(ref.length===2 && typeof ref[0]==='number') return ref; return ref[0].port(ref[1]); }
+    _pt(ref){ return portPt(ref); }
     pos(p){ const leg=p.route[p.i]; return Tween.lerpPt(this._pt(leg.from), this._pt(leg.to), Tween.ease(p.t)); }
     draw(g,env){ const light=env&&env.theme&&relLum(env.theme.bg)>0.5;   // solid dot on a light bg (glow washes out)
       for(const p of this.packets){ const leg=p.route[p.i]; const st=leg.style||p.style;
@@ -466,7 +632,7 @@ const globalThis = __ns;
 
   // ─────────────────────────────────────────────────────────── FlowRuntime (temporal control)
   // The discrete-event core of an animated diagram, factored out of bespoke per-frame code so the
-  // behaviour DSL (see DIAGRAM-LANGUAGE-DESIGN.md) can drive it. One update(dt,now) runs five
+  // The behaviour DSL can drive this runtime. One update(dt,now) runs five
   // phases in a FIXED order, which is what makes a refactor onto it behaviour-preserving:
   //   1. sources    — periodic emitters (a rate accumulator + optional guard)          `flow … rate:`
   //   2. onFrame    — host per-frame work (decay, surge, …)                            `js{ … }` escape
@@ -476,7 +642,7 @@ const globalThis = __ns;
   // Pure logic (no canvas) → unit-testable.
   class FlowRuntime {
     constructor(){ this.now=0; this._sources=[]; this._timers=[]; this._periodics=[];
-      this._onFrame=null; this._afterFrame=null; this._timerBudget=null; this._modes={}; this._events={}; }
+      this._onFrame=null; this._afterFrame=null; this._timerBudget=null; this._modes={}; this._events={}; this._modeHooks=[]; }
     // Named events: `after D: ev` schedules emit(ev) at t+D; `on ev(p): …` handlers register here.
     onEvent(name, fn){ (this._events[name] || (this._events[name] = [])).push(fn); return this; }
     emit(name, arg){ const hs=this._events[name]; if(hs) for(const h of hs) h(arg); return this; }
@@ -485,7 +651,12 @@ const globalThis = __ns;
     // (the `mode(name)` expression built-in reads this). `op:'drainMul'` is parsed + stored for the
     // periodics phase (wired with `every … per …`); it does not affect sources.
     defineMode(name, effects){ this._modes[name]={active:false, effects:effects||[]}; return this; }
-    setMode(name, on){ const m=this._modes[name]; if(m) m.active=(on!==false); return this; }
+    // F14: a mode can drive STATE, not just rate. SceneBuilder registers a hook here (it owns the
+    // components); setMode calls it ONLY on an actual on/off transition, so state effects apply once
+    // on enter and revert once on exit (no double-apply from a redundant toggle).
+    onModeChange(fn){ this._modeHooks.push(fn); return this; }
+    setMode(name, on){ const m=this._modes[name]; if(m){ const was=m.active; m.active=(on!==false);
+      if(m.active!==was) for(const h of this._modeHooks) h(name, m.active); } return this; }
     modeActive(name){ const m=this._modes[name]; return !!(m && m.active); }
     modeNames(){ return Object.keys(this._modes); }
     _rateFactor(){ let f=1; for(const k in this._modes){ const m=this._modes[k];
@@ -541,6 +712,7 @@ const globalThis = __ns;
       this.title=spec.title||null; this.subtitle=spec.subtitle||null; this.background=spec.background||null;
       this.onUpdate=spec.onUpdate||null;
       this.now=0; this.paused=false; this.speed=1; this._hover=null; this._lastT=0;
+      this.ghostOn=false;                                    // F16: counterfactual layer hidden until toggled
       this._insEl=null; this._insDefault=''; this._stopped=false; this._raf=null;
       this._bindMouse();
     }
@@ -549,9 +721,11 @@ const globalThis = __ns;
     addRoad(r){ this.roads.push(r); return r; }
     connector(from,to,opts){ const c=new Connector(from,to,opts); this.connectors.push(c); return c; }
     note(ref,text){ const n=new Note(ref,text); this.annotations.push(n); return n; }
+    divider(spec){ const d=new Divider(spec); this.annotations.push(d); return d; }
     overlay(fn){ this.overlays.push(fn); return this; }
     inspector(el, defaultHTML){ this._insEl=el; this._insDefault=defaultHTML||''; this._setIns(null); return this; }
     setPaused(b){ this.paused=b; } setSpeed(s){ this.speed=s; }
+    setGhost(b){ this.ghostOn=!!b; return this; }           // F16: show/hide the counterfactual overlay
     env(){ return {now:this.now, dt:this._dt||0, theme:this.theme, kindColors:this.kindColors, flow:this.flow, diagram:this}; }
 
     _bindMouse(){
@@ -575,7 +749,8 @@ const globalThis = __ns;
     start(){ this._stopped=false; const loop=t=>{ if(this._stopped) return;   // dispose()/stop() halts the loop
         if(!this._lastT) this._lastT=t;
         const dt=Math.min(0.05,(t-this._lastT)/1000)*this.speed; this._lastT=t; this._dt=dt;
-        if(!this.paused){ this.now+=dt; if(this.onUpdate) this.onUpdate(dt,this.now); this.flow.update(dt); }
+        if(!this.paused){ this.now+=dt; if(this.onUpdate) this.onUpdate(dt,this.now); this.flow.update(dt);
+          for(const c of this.components) if(c.update) c.update(dt, this.now); }   // per-component per-frame hook (e.g. matrix decay:)
         this.render(); this._raf=global.requestAnimationFrame(loop); };
       this._raf=global.requestAnimationFrame(loop); return this; }
     // Halt the animation loop (cancel the pending frame). Idempotent; safe to call before start().
@@ -653,7 +828,7 @@ const globalThis = __ns;
     } }
   }
 
-  const API = { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, FlowSystem, FlowRuntime, StateStore, Diagram };
+  const API = { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, Slot, Readout, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, Divider, Ghost, FlowSystem, FlowRuntime, StateStore, Diagram };
   if (typeof module!=='undefined' && module.exports) module.exports = API;
   /* node:coverage disable */                         // browser UMD tail (window.Flowdot) — unreachable under node
   else global.Flowdot = API;
@@ -700,6 +875,8 @@ const globalThis = __ns;
   const KINDS = {
     box:      (id, s) => new DK.Box(id, s),
     core:     (id, s) => new DK.Core(id, s),
+    slot:     (id, s) => new DK.Slot(id, s),
+    readout:  (id, s) => new DK.Readout(id, s),
     ring:     (id, s) => new DK.RingBuffer(id, s),
     matrix:   (id, s) => new DK.Matrix(id, s),
     pipeline: (id, s) => new DK.Pipeline(id, s),
@@ -721,6 +898,8 @@ const globalThis = __ns;
   const DIM_DEFAULTS = {
     box:      { w: 140, h: 56 },
     core:     { w: 160, h: 60 },
+    slot:     { w: 120, h: 56 },
+    readout:  { w: 120, h: 60 },
     pipeline: { w: 150, h: 72 },
     // ring gives only a default height (for rail-centering); its width is label-aware and computed by
     // RingBuffer itself, so a ring's box reserves its full drawn extent (circle + side label).
@@ -881,11 +1060,15 @@ const globalThis = __ns;
   function recorder() {
     return {
       components: [], zones: [], roads: [], connectors: [], annotations: [], legend: null, flow: new DK.FlowSystem(), now: 0,
+      overlays: [], W: 0, H: 0, ghostOn: false,
+      setGhost(b) { this.ghostOn = !!b; return this; },                  // F16: toggle the counterfactual layer
       add(c) { this.components.push(c); return c; },
       addZone(z) { this.zones.push(z); return z; },
       addRoad(r) { this.roads.push(r); return r; },
       connector(from, to, opts) { const c = new DK.Connector(from, to, opts); this.connectors.push(c); return c; },
       note(ref, text) { const n = { ref, text }; this.annotations.push(n); return n; },
+      divider(spec) { const d = new DK.Divider(spec); this.annotations.push(d); return d; },   // F12: free labelled line
+      overlay(fn) { this.overlays.push(fn); return this; },              // narration (F10) draws here; captured for tests
     };
   }
 
@@ -965,6 +1148,11 @@ const globalThis = __ns;
       if (!c) throw new Error('scene.build: note references unknown node "' + n.target + '"');
       diagram.note(c, n.text);
     });
+    (ir.dividers || []).forEach(d => diagram.divider(resolveColors(Object.assign({}, d), theme)));  // F12: free labelled line
+    if (ir.ghosts && ir.ghosts.length && diagram.overlay) {             // F16: a toggleable counterfactual layer, hidden by default
+      const ghosts = ir.ghosts.map(gh => new DK.Ghost(resolveColors(Object.assign({}, gh), theme)));
+      diagram.overlay((g, env) => { if (env.diagram && env.diagram.ghostOn) for (const gh of ghosts) gh.draw(g, env); });
+    }
     if (ir.legend && ir.legend.length)                                  // resolve each swatch #token per theme
       diagram.legend = ir.legend.map(e => ({ label: e.label, color: DK.resolveColor(e.color, theme) }));
 
@@ -1026,10 +1214,21 @@ const globalThis = __ns;
     // One state store per diagram: hop `{ actions }` mutate it; expressions read it via env(). Exposed
     // on the runtime (rt.store) so later phases (on/every) and callers/tests can inspect it.
     const store = rt.store = new DK.StateStore();
+    // F8: a `readout` node renders a LIVE store value. The store isn't in the draw env, so bind a getter
+    // here. Watch a flat store key (counter/value/ring depth via env(), or `superseded`), or a dotted
+    // `comp.prop` (e.g. a ring's `overruns`) read straight off the bound component.
+    const readLive = key => { const s = String(key), dot = s.indexOf('.');
+      if (dot >= 0) { const comp = ctx.byId[s.slice(0, dot)]; return comp ? comp[s.slice(dot + 1)] : 0; }
+      if (s === 'superseded') return store.superseded;
+      const e = store.env(); return (s in e) ? e[s] : 0; };
+    Object.keys(ctx.byId).forEach(id => { const c = ctx.byId[id];
+      if (c instanceof DK.Readout) c.get = () => readLive(c.watch); });
     const Flow = getFlow();                                            // resolve now (all scripts loaded)
-    // rand()/mode()/dirty() built-ins for exprs. dirty(name) reads the store's per-cell dirty flag
-    // (set by `write`/`dirty`, cleared by `clean`/`drain`) so `every … when dirty(slot)` works.
-    const built = { rand, mode: name => rt.modeActive(name), dirty: name => store.isDirty(name) };
+    // rand()/mode()/dirty()/now() built-ins for exprs. dirty(name) reads the store's per-cell dirty flag
+    // (set by `write`/`dirty`, cleared by `clean`/`drain`) so `every … when dirty(slot)` works. now()
+    // is the runtime clock in seconds (F17) — time-as-a-value, so `set last = now()` + a periodic guard
+    // `when now() - last >= W` expresses a window-boundary / silence watchdog with no host timer.
+    const built = { rand, mode: name => rt.modeActive(name), dirty: name => store.isDirty(name), now: () => rt.now };
     // Tier-2 host escape: `model "<path>"` (node require) or `model <GlobalName>` (browser global);
     // ctx.model overrides. Resolved lazily on first `call`, then cached (a diagram may name a model
     // it never calls). NB: not yet gated by a safe mode — that's a later task.
@@ -1078,8 +1277,50 @@ const globalThis = __ns;
         if (verb === 'write') c.write(i, j, { value: value, fresh: 1 });
         else if (verb === 'dirty') c.write(i, j, { fresh: 1 });
         else if (verb === 'clean') { const cell = c.cell(i, j); if (cell) cell.fresh = 0; }
+      } else if (c instanceof DK.Slot && dot < 0) {                    // F4: a single last-value slot, keyed by its own id
+        if (verb === 'write') c.set(value, ctx.diagram.now);           // produce a value (overwrite-while-dirty → supersede flash)
+        else if (verb === 'dirty') c.mark(ctx.diagram.now);
+        else if (verb === 'clean') c.read();                           // subscriber read it
       }
     };
+    // Component-method verbs (F5): call a real method on the bound component (no store side-effect).
+    //   highlight <matrixId>.row:i   → Matrix.highlightRow(i)   (the shard reading a whole row)
+    //   down/up   <matrixId>.col:j   → Matrix.setDown(j, …)      (a feed going DOWN / back UP)
+    //   surge     <ringId> [= n]     → RingBuffer.surge(n)       (a lane lapping under load; default 3)
+    const driveMethod = (verb, name, amount) => {
+      if (name == null) return;
+      const s = String(name), dot = s.indexOf('.');
+      const c = ctx.byId[dot >= 0 ? s.slice(0, dot) : s];
+      if (!c) return;
+      if (verb === 'surge') { if (c instanceof DK.RingBuffer) c.surge(amount != null ? amount : 3); return; }
+      if (verb === 'snapshot') {                                       // F18: bulk read — whole grid (no dot) or one row (`.row:i`)
+        if (c instanceof DK.Matrix) {
+          if (dot < 0) c.snapshot(null, ctx.diagram.now);
+          else { const seg = s.slice(dot + 1).split(':'); if (seg[0] === 'row') { const i = +seg[1]; if (i >= 0 && i < c.rows) c.snapshot(i, ctx.diagram.now); } }
+        }
+        return;
+      }
+      if (!(c instanceof DK.Matrix) || dot < 0) return;
+      const seg = s.slice(dot + 1).split(':'), kind = seg[0], idx = +seg[1];   // 'row:i' | 'col:j'
+      if (!(idx >= 0)) return;
+      if (verb === 'highlight' && kind === 'row' && idx < c.rows) c.highlightRow(idx, ctx.diagram.now);
+      else if ((verb === 'down' || verb === 'up') && kind === 'col' && idx < c.cols) c.setDown(idx, verb === 'down');
+    };
+    // F14: a mode can drive STATE (not just rate). On toggle, apply a mode's state effects on enter and
+    // revert them on exit — reusing the F5 method verbs (down⇄up, surge⇄negate) + a matrix decay multiplier.
+    const applyModeEffect = (e, on) => {
+      if (e.op === 'method') {
+        if (e.verb === 'surge') { const c = ctx.byId[e.target]; const amt = e.amount != null ? e.amount : 3;
+          if (c && c.surge) c.surge(on ? amt : -amt); return; }             // enter floods; exit drains the same
+        driveMethod(on ? e.verb : (e.verb === 'down' ? 'up' : 'down'), e.target);   // down⇄up on enter/exit
+      } else if (e.op === 'decayMul') { const c = ctx.byId[e.target];
+        if (c && c.decayRate) c.decayRate = on ? c.decayRate * e.factor : c.decayRate / e.factor; }
+    };
+    const modeState = {};                                                  // name → its state effects (method/decayMul)
+    (ir.modes || []).forEach(m => { const st = (m.effects || []).filter(e => e.op === 'method' || e.op === 'decayMul');
+      if (st.length) modeState[m.name] = st; });
+    if (Object.keys(modeState).length)
+      rt.onModeChange((name, on) => { const st = modeState[name]; if (st) for (const e of st) applyModeEffect(e, on); });
     // Execute an action list. leg/style are the owning flow's (or handler's) builders — passed so a
     // `spawn` rebuilds legs in the right context. `p` (optional) is the current packet, for `drop`.
     const runActions = (actions, penv, leg, style, p) => { if (!actions) return;
@@ -1090,7 +1331,11 @@ const globalThis = __ns;
         }
         if (a.verb === 'spawn') {                                       // secondary packet along an inline route
           const legs = []; for (let i = 1; i < a.route.length; i++) legs.push(leg(a.route[i - 1], a.route[i], penv));
-          if (legs.length) ctx.diagram.flow.spawn(legs, style());
+          if (legs.length) {
+            const st = style();                                         // F7: a `#colour` on the spawn overrides the packet colour (else the flow's)
+            if (a.color) st.style = Object.assign({}, st.style, { color: DK.resolveColor(a.color, flowTheme) || st.style.color });
+            ctx.diagram.flow.spawn(legs, st);
+          }
         } else if (a.verb === 'after') {                               // schedule a named event at t+D
           rt.after(a.delay, () => rt.emit(a.event, penv));
         } else if (a.verb === 'call') {                                // Tier-2 host escape into the model
@@ -1100,10 +1345,13 @@ const globalThis = __ns;
           if (typeof fn !== 'function') throw new Error('scene: model has no function "' + a.fn + '"');
           const ret = fn.apply(model, a.args.map(x => Flow.evalExpr(x, envOf(penv))));
           if (a.assign != null) store.set(a.assign, ret);
+        } else if (a.verb === 'highlight' || a.verb === 'down' || a.verb === 'up' || a.verb === 'surge' || a.verb === 'snapshot') {
+          driveMethod(a.verb, tpl(a.name, penv), a.expr != null ? Flow.evalExpr(a.expr, envOf(penv)) : undefined);  // F5/F18: call the component method
         } else {                                                       // count/set/write/push/drain/dirty/clean
+          const name = tpl(a.name, penv);                               // F6: interpolate `{i}` in the target against per-fire picks (write grid.{i}.0)
           const value = a.expr != null ? Flow.evalExpr(a.expr, envOf(penv)) : undefined;
-          store.apply(a.expr != null ? { verb: a.verb, name: a.name, value } : a);
-          driveComponent(a.verb, a.name, value);                        // reflect on the bound ring/matrix, if any
+          store.apply(a.expr != null ? { verb: a.verb, name, value } : Object.assign({}, a, { name }));
+          driveComponent(a.verb, name, value);                          // reflect on the bound ring/matrix, if any
         }
       }
     };
@@ -1162,6 +1410,29 @@ const globalThis = __ns;
       if (branchable) fork.options.forEach(o => { if (!isTpl(o.node)) nodeOf(fl, o.node); });  // templates: at fire time
       const style = styleFor(fl);
       const leg = legFor(fl);
+      // F15: a `#colour` on a hop or a branch option recolours THAT leg (the packet's fate drives its
+      // colour) — set on the leg's own style, which FlowSystem.draw prefers over the packet style. So a
+      // demux (`| ~d emitted #gold when q>0 | ~d suppressed #rose when q<0`) shows each outcome's colour,
+      // and the option's destination node already flashes on arrival.
+      const colorLeg = (bl, hop) => { if (hop && hop.color) { const c = DK.resolveColor(hop.color, flowTheme);
+        if (c) bl.style = Object.assign({}, style().style, { color: c }); } return bl; };
+      // F3b: a hop `pipe.stages` expands into sub-legs across the target pipeline's stage:0…k ports,
+      // so the packet visibly WALKS the stages (decode→canonicalise→offer) instead of the stages
+      // blinking decoupled. Stage count lives on the built component (build-time), so expand here:
+      // split the hop's dur evenly, and run its arrival actions on the last stage.
+      const expandStages = penv => {
+        const out = [];
+        for (const h of route) {
+          if (h.port === 'stages') {
+            const comp = nodeOf(fl, tpl(h.node, penv));
+            const S = (comp && comp.stages && comp.stages.length) || 1;
+            const each = (h.dur || 0.6) / S;
+            for (let k = 0; k < S; k++)
+              out.push({ node: h.node, port: 'stage:' + k, dur: each, actions: k === S - 1 ? h.actions : undefined });
+          } else out.push(h);
+        }
+        return out;
+      };
       const guarded = branchable && fork.options.some(o => o.guard != null);
       const pick = penv => {
         const opts = fork.options;
@@ -1185,15 +1456,19 @@ const globalThis = __ns;
         guard: () => ctx.diagram.flow.size < (fl.max || 200),
         fire: () => {
           const penv = bindPick();
-          if (route[0] && route[0].actions) runActions(route[0].actions, penv, leg, style, null);   // origin: actions at packet birth
+          const eroute = expandStages(penv);                    // F3b: expand any `pipe.stages` hop into per-stage sub-legs
+          const src = eroute[0] ? nodeOf(fl, tpl(eroute[0].node, penv)) : null;  // F3a: pulse the SOURCE on departure,
+          if (src && src.pulse) src.pulse(ctx.diagram.now);                     // so adapters / source pipelines animate (not just the arrival node)
+          if (eroute[0] && eroute[0].actions) runActions(eroute[0].actions, penv, leg, style, null);   // origin: actions at packet birth
           const prefix = [];
-          for (let i = 1; i < route.length; i++) prefix.push(leg(route[i - 1], route[i], penv));
-          const from = route[route.length - 1];                 // the branch-from node
+          for (let i = 1; i < eroute.length; i++) prefix.push(colorLeg(leg(eroute[i - 1], eroute[i], penv), eroute[i]));
+          const from = eroute[eroute.length - 1];               // the branch-from node
           if (!branchable) { if (prefix.length) ctx.diagram.flow.spawn(prefix, style()); return; }
           if (fork.mode === 'pick') {
-            ctx.diagram.flow.spawn(prefix.concat([leg(from, pick(penv), penv)]), style());
+            const o = pick(penv);
+            ctx.diagram.flow.spawn(prefix.concat([colorLeg(leg(from, o, penv), o)]), style());
           } else {                                               // 'all' → fan out at the branch node
-            const fan = () => fork.options.forEach(o => ctx.diagram.flow.spawn([leg(from, o, penv)], style()));
+            const fan = () => fork.options.forEach(o => ctx.diagram.flow.spawn([colorLeg(leg(from, o, penv), o)], style()));
             if (!prefix.length) { fan(); return; }
             const last = prefix[prefix.length - 1], prev = last.onArrive;   // split once the packet arrives
             last.onArrive = p => { if (prev) prev(p); fan(); };
@@ -1202,6 +1477,31 @@ const globalThis = __ns;
         },
       });
     });
+    // F10: a narration timeline — a scripted, looping sequence of (dwell, node(s), caption) steps that
+    // spotlights the step's node(s) and shows its caption, driven purely by the runtime clock (no JS,
+    // no timers). Rendered as a Diagram overlay so it's deterministic from `now` and self-contained.
+    const narr = ir.narration;
+    if (narr && narr.steps && narr.steps.length && ctx.diagram && ctx.diagram.overlay) {
+      narr.steps.forEach(s => s.nodes.forEach(id => {
+        if (!ctx.byId[id]) throw new Error('scene: narrate references unknown node "' + id + '"'); }));
+      const steps = narr.steps, total = steps.reduce((a, s) => a + s.dur, 0);
+      const stepAt = now => { let t = total > 0 ? now % total : 0, acc = 0;
+        for (const s of steps) { if (t < acc + s.dur) return s; acc += s.dur; } return steps[steps.length - 1]; };
+      ctx.diagram.overlay((g, env) => {
+        const step = stepAt(env.now);
+        const pulse = 0.55 + 0.35 * Math.sin(env.now * 4);              // a gentle spotlight breath
+        for (const id of step.nodes) { const c = ctx.byId[id]; if (!c) continue;
+          const b = c.bounds ? c.bounds() : { x: c.x, y: c.y, w: c.w, h: c.h };
+          g.save(); g.strokeStyle = env.theme.accent; g.globalAlpha = pulse; g.lineWidth = 2.6;
+          DK.Draw.roundRect(g, b.x - 6, b.y - 6, b.w + 12, b.h + 12, 11); g.stroke(); g.restore(); }
+        if (step.caption) { const W = ctx.diagram.W, H = ctx.diagram.H;
+          g.save(); g.font = '13px ui-monospace,monospace'; const tw = g.measureText(step.caption).width;
+          const bw = tw + 30, bx = (W - bw) / 2, by = H - 46;
+          g.globalAlpha = 0.94; g.fillStyle = env.theme.panel2; DK.Draw.roundRect(g, bx, by, bw, 32, 8); g.fill();
+          g.globalAlpha = 1; g.strokeStyle = env.theme.line; g.lineWidth = 1; DK.Draw.roundRect(g, bx, by, bw, 32, 8); g.stroke();
+          DK.Draw.text(g, step.caption, W / 2, by + 20, { c: env.theme.text, size: 13, align: 'center' }); g.restore(); }
+      });
+    }
     return rt;
   }
 
@@ -1304,6 +1604,13 @@ const globalThis = __ns;
     return s;                                                     // #colour-token, bareword, etc. (colours resolve at build)
   }
 
+  // Parse an `x,y` coordinate token (used by divider/rule and ghost). `kw` names the statement for errors.
+  function xyCoord(tok, ln, kw) {
+    const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(tok || '');
+    if (!m) throw new Error('flow: line ' + ln + ': ' + kw + ' needs coordinates `x,y` (got "' + (tok == null ? '' : tok) + '")');
+    return [Number(m[1]), Number(m[2])];
+  }
+
   // Colours carry a `#` sigil (a #hex like #5cb4ff or a #name like #sky), or are an rgb()/hsl() function.
   // The parser only enforces the SIGIL — a bareword like `red` (missing #) is the loud error. What a
   // #name actually means is resolved against the active theme at BUILD time (scene → Flowdot.resolveColor):
@@ -1320,10 +1627,12 @@ const globalThis = __ns;
   // Per-kind attribute schema — the top agent-safety guardrail: a misspelled/unknown key on a known
   // built-in kind throws a located error listing the valid keys, instead of being silently kept.
   // Custom (registered) kinds are unknown to the parser, so they are NOT validated (pass through).
-  const NODE_COMMON = ['id', 'kind', 'x', 'y', 'w', 'h', 'inspect', 'hoverable', 'lane', 'rail', 'align', 'inset'];
+  const NODE_COMMON = ['id', 'kind', 'x', 'y', 'w', 'h', 'inspect', 'hoverable', 'lane', 'rail', 'align', 'inset', 'decay'];
   const KIND_KEYS = {
     box:      NODE_COMMON.concat(['name', 'sub', 'accent']),
-    core:     NODE_COMMON.concat(['name', 'sub', 'accent', 'lit']),
+    core:     NODE_COMMON.concat(['name', 'sub', 'accent', 'lit', 'idle', 'owns']),
+    slot:     NODE_COMMON.concat(['name', 'accent', 'value']),
+    readout:  NODE_COMMON.concat(['watch', 'name', 'label', 'unit', 'accent', 'value']),
     ring:     NODE_COMMON.concat(['slots', 'r', 'color', 'label']),
     matrix:   NODE_COMMON.concat(['rows', 'cols', 'cw', 'ch', 'gap', 'colColors', 'rowLabels', 'colLabels', 'title', 'subtitle', 'cellNote']),
     pipeline: NODE_COMMON.concat(['stages', 'nodeR', 'idle', 'vertical', 'boxed', 'pinned', 'name', 'accent', 'pad', 'step']),
@@ -1331,7 +1640,7 @@ const globalThis = __ns;
   };
   // Accepted style keys on an `edge` (a Connector). A key outside this set throws instead of being
   // silently kept-and-ignored. Colour is a bare `#token` (→ `c`); `dashed` is a bare flag.
-  const EDGE_KEYS = new Set(['label', 'alpha', 'dash', 'dashed', 'c', 'pulseColor', 'lw']);
+  const EDGE_KEYS = new Set(['label', 'alpha', 'dash', 'dashed', 'c', 'pulseColor', 'lw', 'route']);
   function validateKeys(obj, kind, ln) {
     const allowed = KIND_KEYS[kind];
     if (!allowed) return;                                          // custom/unknown kind → not our schema
@@ -1345,7 +1654,7 @@ const globalThis = __ns;
   // ring/road/flow via `color`, edge via `c`. So `node q core #sky` == `accent:#sky`, `road a ~> b #emerald`
   // == `color:#emerald`. matrix has no single colour (its columns use `colColors`), so a bare colour on it
   // lands on `color` and trips its schema — use `colColors:[…]` there.
-  const KIND_COLOR_KEY = { box: 'accent', core: 'accent', pipeline: 'accent', zone: 'accent', ring: 'color' };
+  const KIND_COLOR_KEY = { box: 'accent', core: 'accent', slot: 'accent', readout: 'accent', pipeline: 'accent', zone: 'accent', ring: 'color' };
   const colorKeyFor = kind => KIND_COLOR_KEY[kind] || 'color';
   // Kinds whose single default colour a `colors <kind>:#tok` statement can override (they paint through
   // themeKindColor). matrix (per-column `colColors` ramp) and flow (packet colour = its route/road) use
@@ -1380,7 +1689,7 @@ const globalThis = __ns;
   //   add := mul (('+'|'-') mul)*
   //   mul := prim (('*'|'/'|'%') prim)*
   //   prim:= number | '(' or ')' | '!' prim | '-' prim | name ('[' or ']')? | builtin
-  //   builtin := 'rand' '(' ')' | 'mode' '(' name ')' | 'dirty' '(' name ')'
+  //   builtin := 'rand' '(' ')' | 'mode' '(' name ')' | 'dirty' '(' name ')' | 'now' '(' ')'
   // Built-ins resolve against optional callbacks on `env`: `env.rand()` (a seeded ()=>[0,1) so
   // animations stay reproducible) and `env.mode(name)` (is a named mode active?). Calling one where
   // its callback is absent (e.g. a structural `{expr}` interpolation) throws a clear error. Numbers,
@@ -1405,6 +1714,9 @@ const globalThis = __ns;
       if (t === 'dirty' && peek() === '(') { eat(); const name = eat(); expect(')');
         if (typeof env.dirty !== 'function') throw new Error('flow: dirty() is not available in this context');
         return env.dirty(name); }
+      if (t === 'now' && peek() === '(') { eat(); expect(')');       // F17: the runtime clock (seconds) — time-as-a-value, for window/silence guards
+        if (typeof env.now !== 'function') throw new Error('flow: now() is not available in this context');
+        return env.now(); }
       let v = env[t];                                            // identifier
       if (peek() === '[') { eat(); const i = or(); expect(']'); v = v[i]; }  // name[idx]
       return v;
@@ -1431,7 +1743,7 @@ const globalThis = __ns;
   // these, which is how interpolate() tells an action block apart from a `{expr}` (both use braces):
   // a brace whose first word is a verb is left literal for the flow parser; anything else is a value
   // expression and is evaluated (so a real interpolation typo still throws loudly).
-  const ACTION_VERBS = /^(count|set|write|push|drain|dirty|clean|pulse|spawn|drop|after|call)\b/;
+  const ACTION_VERBS = /^(count|set|write|push|drain|dirty|clean|pulse|spawn|drop|after|call|highlight|down|up|surge|snapshot)\b/;
   // `protect` (optional) is a list of names bound per-fire at run time (flow `pick` vars): a brace
   // referencing one is left literal here and resolved later, not at expand time.
   const interpolate = (text, env, protect) => text.replace(/\{([^}]+)\}/g, (m, e, offset, full) => {
@@ -1477,10 +1789,21 @@ const globalThis = __ns;
     return body.split(';').map(s => s.trim()).filter(Boolean).map(part => {
       let m;
       if ((m = /^count\s+([A-Za-z_]\w*)$/.exec(part))) return { verb: 'count', name: m[1] };
-      if ((m = /^(set|write)\s+([A-Za-z_][\w.]*)\s*=\s*(.+)$/.exec(part))) return { verb: m[1], name: m[2], expr: m[3].trim() };
-      if ((m = /^(push|drain|dirty|clean)\s+([A-Za-z_][\w.]*)$/.exec(part))) return { verb: m[1], name: m[2] };
+      // target may carry a `{expr}` interpolation (F6) — e.g. `write grid.{i}.0` — resolved per-fire against the pick bindings.
+      if ((m = /^(set|write)\s+([A-Za-z_][\w.{}]*)\s*=\s*(.+)$/.exec(part))) return { verb: m[1], name: m[2], expr: m[3].trim() };
+      if ((m = /^(push|drain|dirty|clean)\s+([A-Za-z_][\w.{}]*)$/.exec(part))) return { verb: m[1], name: m[2] };
+      // component-method verbs (F5): highlight <m>.row:i · down/up <m>.col:j · surge <ring> [= amount].
+      // target may carry `:` (row:/col:) and a `{pick}` interpolation.
+      if ((m = /^(highlight|down|up)\s+([A-Za-z_][\w.:{}]*)$/.exec(part))) return { verb: m[1], name: m[2] };
+      if ((m = /^surge\s+([A-Za-z_][\w.{}]*)(?:\s*=\s*(.+))?$/.exec(part))) return { verb: 'surge', name: m[1], expr: m[2] ? m[2].trim() : undefined };
+      // F18: `snapshot <matrix>` reads (visibly pulls) the WHOLE grid at once; `snapshot <matrix>.row:i` one row.
+      if ((m = /^snapshot\s+([A-Za-z_][\w.:{}]*)$/.exec(part))) return { verb: 'snapshot', name: m[1] };
       if ((m = /^after\s+(\d*\.?\d+)\s*:\s*([A-Za-z_]\w*)$/.exec(part))) return { verb: 'after', delay: Number(m[1]), event: m[2] };
-      if ((m = /^spawn\s+(.+)$/.exec(part))) return { verb: 'spawn', route: parseLinearRoute(m[1], ln) };
+      if ((m = /^spawn\s+(.+)$/.exec(part))) {                       // `spawn <route> [#colour]` (F7: colour the spawned packet)
+        let route = m[1].trim(), color = null, cm;
+        if ((cm = /\s(#\S+)$/.exec(route))) { color = cm[1]; route = route.slice(0, cm.index); }
+        return color ? { verb: 'spawn', route: parseLinearRoute(route, ln), color } : { verb: 'spawn', route: parseLinearRoute(route, ln) };
+      }
       if ((m = /^drop(?:\s+if\s+(.+))?$/.exec(part))) return { verb: 'drop', cond: m[1] ? m[1].trim() : '1' };
       if ((m = /^call\s+(?:([A-Za-z_]\w*)\s*=\s*)?([A-Za-z_]\w*)\s*\(([^)]*)\)$/.exec(part))) {  // Tier-2 host escape
         if (safe) throw new Error('flow: line ' + ln + ": 'call' is disabled in safe mode");
@@ -1606,7 +1929,7 @@ const globalThis = __ns;
           ir.behavior = true;
           break;
         }
-        case 'mode': {       // `mode <name>: <effect>; <effect>` — spawn xN | tier>=k drain xM
+        case 'mode': {       // `mode <name>: <effect>; …` — spawn xN | tier>=k drain xM | down/up <m>.col:j | surge <ring> [= n] | decay <m> x<f>
           // Parsed off the raw line (mini-grammar with `;`/`>=`/`x` sigils the ws-tokenizer would
           // fragment). Modes carry no #hex, so any `#` starts a comment → strip it.
           const src = line.split('#')[0];
@@ -1617,13 +1940,18 @@ const globalThis = __ns;
             let e;
             if ((e = /^spawn\s+x(\d*\.?\d+)$/.exec(part))) effects.push({ op: 'rate', factor: Number(e[1]) });
             else if ((e = /^tier\s*>=\s*(\d+)\s+drain\s+x(\d*\.?\d+)$/.exec(part))) effects.push({ op: 'drainMul', tierFrom: Number(e[1]), factor: Number(e[2]) });
+            // F14: a mode can drive STATE, not just rate — the F5 method verbs applied on enter and
+            // reverted on exit (down⇄up, surge⇄drain), plus a decay-rate multiplier on a matrix.
+            else if ((e = /^(down|up)\s+([A-Za-z_][\w.:]*)$/.exec(part))) effects.push({ op: 'method', verb: e[1], target: e[2] });
+            else if ((e = /^surge\s+([A-Za-z_][\w.]*)(?:\s*=\s*(\d*\.?\d+))?$/.exec(part))) effects.push({ op: 'method', verb: 'surge', target: e[1], amount: e[2] != null ? Number(e[2]) : undefined });
+            else if ((e = /^decay\s+([A-Za-z_][\w.]*)\s+x(\d*\.?\d+)$/.exec(part))) effects.push({ op: 'decayMul', target: e[1], factor: Number(e[2]) });
             else throw new Error('flow: line ' + ln + ': unknown mode effect "' + part + '"');
           });
           (ir.modes || (ir.modes = [])).push({ name: m[1], effects });
           break;
         }
         case 'every': {      // `every <rate>[s] per <v> in <list> [when <cond>]: <actions>` → ir.periodics
-          const src = line.split('#')[0];
+          const src = line.replace(/\s+#\s.*$/, '');   // strip a trailing `# comment` (space after #) but KEEP a glued `#token` (F7 colour on a spawn)
           const m = /^every\s+(\S+)\s+per\s+([A-Za-z_]\w*)\s+in\s+(\[[^\]]*\]|\S+?)(?:\s+when\s+(.+?))?\s*:\s*(.*)$/.exec(src.trim());
           if (!m || !m[5].trim()) throw new Error('flow: line ' + ln + ': every must be `every <rate> per <var> in <list> [when <cond>]: <actions>`');
           const rate = Number(String(m[1]).replace(/s$/, ''));
@@ -1696,10 +2024,54 @@ const globalThis = __ns;
           (ir.notes || (ir.notes = [])).push({ text: unquote(t[1]), target: t[ai + 1] });
           break;
         }
+        case 'divider':
+        case 'rule': {   // F12: a free labelled line — `divider "label" x1,y1 -> x2,y2 [#colour] [solid]`.
+          //             The label is optional; `solid` drops the default dashes. Not tied to any node.
+          const ai = t.indexOf('->');
+          if (ai < 1) throw new Error('flow: line ' + ln + ': ' + kw + ' must be `' + kw + ' ["label"] x1,y1 -> x2,y2 [#colour] [solid]`');
+          const [x1, y1] = xyCoord(t[ai - 1], ln, kw), [x2, y2] = xyCoord(t[ai + 1], ln, kw);
+          const d = { x1, y1, x2, y2 };
+          if (t[1] && t[1][0] === '"') d.label = unquote(t[1]);       // optional leading label
+          for (const tk of t.slice(ai + 2)) {                          // trailing #colour / solid|dashed
+            if (isColor(tk)) d.color = coerce(tk);
+            else if (tk === 'solid') d.dashed = false;
+            else if (tk === 'dashed') d.dashed = true;
+            else throw new Error('flow: line ' + ln + ': ' + kw + ' — unexpected "' + tk + '" (want #colour or solid/dashed)');
+          }
+          (ir.dividers || (ir.dividers = [])).push(d);
+          break;
+        }
+        case 'ghost': { // F16: a counterfactual callout — `ghost "caption" x,y [-> x2,y2] [#colour]`.
+          //            Ghosts form a toggleable layer (hidden by default); accumulate into ir.ghosts.
+          if (!t[1] || t[1][0] !== '"')
+            throw new Error('flow: line ' + ln + ': ghost must be `ghost "caption" x,y [-> x2,y2] [#colour]`');
+          const ai = t.indexOf('->');
+          const [x, y] = xyCoord(t[2], ln, 'ghost');
+          const gh = { text: unquote(t[1]), x, y };
+          if (ai >= 0) { const [x2, y2] = xyCoord(t[ai + 1], ln, 'ghost'); gh.x2 = x2; gh.y2 = y2; }
+          for (const tk of (ai >= 0 ? t.slice(ai + 2) : t.slice(3))) {   // trailing #colour only
+            if (isColor(tk)) gh.color = coerce(tk);
+            else throw new Error('flow: line ' + ln + ': ghost — unexpected "' + tk + '" (want a #colour)');
+          }
+          (ir.ghosts || (ir.ghosts = [])).push(gh);
+          break;
+        }
         case 'legend': { // an opt-in colour key: legend "label" #colour  (one row per line)
           if (!t[1] || t[1][0] !== '"' || !isColor(t[2] || ''))
             throw new Error('flow: line ' + ln + ': legend must be `legend "label" #colour`');
           (ir.legend || (ir.legend = [])).push({ label: unquote(t[1]), color: coerce(t[2]) });
+          break;
+        }
+        case 'narrate': {  // F10: a guided-story step — `narrate <dwell> <node…> : "<caption>"`. Steps
+          //                 accumulate in order and cycle on the clock, spotlighting the node(s) + caption.
+          const ci = t.indexOf(':');
+          if (ci < 0 || t[ci + 1] == null || t[ci + 1][0] !== '"')
+            throw new Error('flow: line ' + ln + ': narrate must be `narrate <dwell> <node…> : "<caption>"`');
+          const dur = Number(t[1]);
+          if (!(dur > 0)) throw new Error('flow: line ' + ln + ': narrate needs a positive dwell time (seconds), got "' + (t[1] == null ? '' : t[1]) + '"');
+          const nodes = t.slice(2, ci);
+          if (!nodes.length) throw new Error('flow: line ' + ln + ': a narrate step needs at least one node to spotlight');
+          (ir.narration || (ir.narration = { steps: [] })).steps.push({ dur, nodes, caption: unquote(t[ci + 1]) });
           break;
         }
         case 'join': {   // fan-in barrier: `join <nodeId> : <inputA> <inputB> …` — the node fires
@@ -1780,9 +2152,10 @@ const globalThis = __ns;
           if (rt.length) {
             // a route node is `id` or `id.port` (port may contain ':', e.g. grid.colTop:0)
             const wOf = tok => { const m = /^@(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
+            const colOf = tok => (typeof tok === 'string' && tok.length > 1 && tok[0] === '#') ? tok : null;   // F15: a `#colour` on a hop/branch → per-outcome packet colour
             const actOf = tok => (tok && tok[0] === '{' && tok[tok.length - 1] === '}') ? tok.slice(1, -1) : null;
             const bad = msg => { throw new Error('flow: line ' + ln + ': ' + msg); };
-            const clean = h => { const o = { node: h.node }; if (h.port != null) o.port = h.port; if (h.dur != null) o.dur = h.dur; if (h.actions != null) o.actions = h.actions; return o; };
+            const clean = h => { const o = { node: h.node }; if (h.port != null) o.port = h.port; if (h.dur != null) o.dur = h.dur; if (h.color != null) o.color = h.color; if (h.actions != null) o.actions = h.actions; return o; };
 
             const hasPick = rt.includes('|'), hasAll = rt.includes('&');
             if (hasPick && hasAll) bad('a flow branch cannot mix "|" and "&"');
@@ -1799,10 +2172,14 @@ const globalThis = __ns;
             const hops = [first];
             while (k < s0.length) {
               const dur = durOf(s0[k]); if (dur == null) bad('expected "~dur" before "' + s0[k] + '"'); k++;
-              if (s0[k] == null || durOf(s0[k]) != null || wOf(s0[k]) != null || actOf(s0[k]) != null) bad('"~dur" without a node');
+              if (s0[k] == null || durOf(s0[k]) != null || wOf(s0[k]) != null || colOf(s0[k]) != null || actOf(s0[k]) != null) bad('"~dur" without a node');
               const hop = Object.assign(rn(s0[k++]), { dur });
-              const w = wOf(s0[k]); if (w != null) { hop.weight = w; k++; }
-              if (s0[k] === 'when') { k++; const gt = []; while (k < s0.length && actOf(s0[k]) == null) gt.push(s0[k++]); if (!gt.length) bad('when needs a condition'); hop.guard = gt.join(' '); }
+              for (;;) {                                        // optional @weight / #colour / when — any order, before {actions}
+                const w = wOf(s0[k]); if (w != null) { hop.weight = w; k++; continue; }
+                const cc = colOf(s0[k]); if (cc != null) { hop.color = cc; k++; continue; }
+                if (s0[k] === 'when') { k++; const gt = []; while (k < s0.length && actOf(s0[k]) == null && wOf(s0[k]) == null && colOf(s0[k]) == null) gt.push(s0[k++]); if (!gt.length) bad('when needs a condition'); hop.guard = gt.join(' '); continue; }
+                break;
+              }
               takeActions(hop);
               hops.push(hop);
             }
@@ -1817,12 +2194,16 @@ const globalThis = __ns;
               for (let s = 1; s < segs.length; s++) {
                 const seg = segs[s], dur = durOf(seg[0]);
                 if (dur == null || seg[1] == null) bad('branch option must be "~dur node [@weight]"');
-                const h = Object.assign(rn(seg[1]), { dur });   // ~dur node [@weight] [when <cond>] [{actions}]
+                const h = Object.assign(rn(seg[1]), { dur });   // ~dur node [@weight] [#colour] [when <cond>] [{actions}]
                 let j = 2;
-                const w = wOf(seg[j]); if (w != null) { h.weight = w; j++; }
-                if (seg[j] === 'when') { j++; const gt = []; while (j < seg.length && actOf(seg[j]) == null) gt.push(seg[j++]); if (!gt.length) bad('when needs a condition'); h.guard = gt.join(' '); }
+                for (;;) {                                      // optional @weight / #colour / when — any order, before {actions}
+                  const w = wOf(seg[j]); if (w != null) { h.weight = w; j++; continue; }
+                  const cc = colOf(seg[j]); if (cc != null) { h.color = cc; j++; continue; }
+                  if (seg[j] === 'when') { j++; const gt = []; while (j < seg.length && actOf(seg[j]) == null && wOf(seg[j]) == null && colOf(seg[j]) == null) gt.push(seg[j++]); if (!gt.length) bad('when needs a condition'); h.guard = gt.join(' '); continue; }
+                  break;
+                }
                 const a = actOf(seg[j]); if (a != null) { h.actions = parseActions(a, ln, safe); j++; }
-                if (seg.length > j) bad('a branch option must be "~dur node [@weight] [{actions}]"');
+                if (seg.length > j) bad('a branch option must be "~dur node [@weight] [#colour] [when <cond>] [{actions}]"');
                 options.push(opt(h));
               }
               f.route = hops.map(clean);                       // the linear prefix (branch node last)
@@ -1971,7 +2352,9 @@ const globalThis = __ns;
         renderModeControls(doc, canvas, r);                           // zero-JS toggle per declared mode
         if (controlsOn(r)) renderTransportControls(doc, canvas, r);   // zero-JS play/pause + reset + speed
         if (wantToggle) renderThemeToggle(doc, canvas, themeName, flipTheme);   // zero-JS dark↔light
+        if (ghostOn(r)) renderGhostToggle(doc, canvas, r.diagram);    // F16: zero-JS counterfactual layer toggle
       }
+      const ghostOn = r => (el.dataset && el.dataset.ghostToggle != null) || (r && r.ir && r.ir.ghosts && r.ir.ghosts.length);
       function remount(text) {
         if (current && typeof current.dispose === 'function') current.dispose();
         current = run(canvas, text, remountOpts);
@@ -2107,6 +2490,27 @@ const globalThis = __ns;
     if (bar.appendChild) bar.appendChild(b);
     canvas.parentNode.insertBefore(bar, canvas.nextSibling);
     canvas.__fvTheme = bar;
+    return bar;
+  }
+
+  // Auto-render a "Ghost" toggle after the canvas — same mechanism as the theme/mode bars, opt-in via
+  // `data-ghost-toggle` on the <script> or any `ghost` line in the source. Unlike the theme toggle it
+  // needs NO re-mount: it just flips diagram.ghostOn, so the next frame shows/hides the counterfactual
+  // overlay. The page stays free of authored JS. No-op without a real DOM or a non-diagram target.
+  function renderGhostToggle(doc, canvas, diagram) {
+    if (canvas.__fvGhost && canvas.__fvGhost.remove) canvas.__fvGhost.remove();   // drop a prior bar (re-mount)
+    canvas.__fvGhost = null;
+    if (!diagram || typeof diagram.setGhost !== 'function') return;
+    if (!doc || !doc.createElement || !canvas.parentNode || !canvas.parentNode.insertBefore) return;
+    const bar = doc.createElement('div'); bar.className = 'flow-ghost';
+    const b = doc.createElement('button'); b.type = 'button'; b.className = 'flow-ghostbtn';
+    const label = () => 'Ghost: ' + (diagram.ghostOn ? 'on' : 'off');
+    b.textContent = label();
+    b.onclick = () => { diagram.setGhost(!diagram.ghostOn);
+      b.textContent = label(); if (b.classList) b.classList.toggle('on', diagram.ghostOn); };
+    if (bar.appendChild) bar.appendChild(b);
+    canvas.parentNode.insertBefore(bar, canvas.nextSibling);
+    canvas.__fvGhost = bar;
     return bar;
   }
 
@@ -2360,7 +2764,7 @@ const globalThis = __ns;
 
 /* ─────────── ESM named exports ─────────── */
 const __F = __ns.Flowdot, __S = __ns.SceneBuilder, __Z = __ns.Flow;
-export const { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, FlowSystem, FlowRuntime, StateStore, Diagram } = __F;
+export const { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, Slot, Readout, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, Divider, Ghost, FlowSystem, FlowRuntime, StateStore, Diagram } = __F;
 export const SceneBuilder = __S;
 export const Flow = __Z;
 export const mount = __F.mount;

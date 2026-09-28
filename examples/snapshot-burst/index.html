@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — snapshot burst (bulk multi-cell read)</title>
+<!-- `snapshot <matrix>` reads (and visibly PULLS) many cells at once: the whole grid for a late-join
+     snapshot, or `snapshot <matrix>.row:i` for a shard's whole-row read. Each pull re-freshens the
+     touched cells and sweeps a burst ring over them — a bulk read, not cell-by-cell. Pair with a
+     `matrix decay:` so the pulled cells settle again. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — snapshot burst</h1>
+  <p class="sub"><code>snapshot grid</code> reads (and visibly <b>pulls</b>) <b>every</b> cell at once — a
+    <b>late-join snapshot</b>; <code>snapshot grid.row:1</code> pulls one <b>whole row</b> — a shard read.
+    Each pull sweeps a burst ring over the cells and re-freshens them (they settle via <code>decay:</code>).
+    No host JS.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "snapshot burst — bulk multi-cell read (no JS)" 720x340
+
+node w      box    x:30  y:60  w:100 h:44 name:"writer" inspect:"<b>writer</b> — continuously writes the grid's cells (a live last-value store)"
+node grid   matrix x:250 y:56  w:156 h:176 rows:3 cols:2 cw:76 ch:56 decay:0.4 title:"store" colLabels:[A,B] inspect:"<b>store</b> — a last-value grid; a snapshot pulls many cells at once and they settle via decay:0.4"
+node reader box    x:30  y:150 w:100 h:44 name:"shard" inspect:"<b>shard</b> — reads one WHOLE ROW at a time (snapshot grid.row:1)"
+node joiner box    x:30  y:250 w:100 h:44 name:"late join" inspect:"<b>late join</b> — a new subscriber pulls the ENTIRE grid at once (snapshot grid) before joining the live stream"
+
+edge w -> grid.colTop:0 alpha:0.22
+edge reader -> grid.rowLeft:1 alpha:0.22
+edge joiner -> grid alpha:0.22
+
+seed 0x51F0
+# a writer keeps the grid populated (one cell per tick)
+flow fill rate:6 pick i in [0,1,2] : w ~0.1 grid { write grid.{i}.0 = 1; write grid.{i}.1 = 2 }
+# a shard reads a whole row at a time — a burst ring sweeps that row
+flow read rate:0.8 : reader ~0.4 grid { snapshot grid.row:1 }
+# a late-joining subscriber snapshots the ENTIRE grid at once before it joins the live stream
+flow late rate:0.35 : joiner ~0.5 grid { snapshot grid }
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

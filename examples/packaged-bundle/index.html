@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — packaged bundle</title>
+<!-- The PACKAGED path. Every other tutorial loads the four unbundled src/*.js files by relative
+     path (fine inside this repo). A CONSUMER should instead load the single built bundle,
+     dist/flowdot.js — one <script src>, everything (renderer + builder + parser + auto-boot) in it.
+     For a static / file:// page, VENDOR that file into your own repo and reference it relatively —
+     never point at node_modules/ (it is gitignored and 404s once the page is committed). See the
+     README "Using flowdot in your own project" section. ZERO authored JavaScript. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — packaged bundle</h1>
+  <p class="sub">the same diagram every other tutorial ships — but loaded from the <b>one built
+    bundle</b> <code>dist/flowdot.js</code> (one <code>&lt;script src&gt;</code>), not the four
+    <code>src/*.js</code> files. This is the path a <b>consumer</b> uses: vendor the bundle and
+    reference it relatively.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "your page → flowdot bundle → canvas" 680x240
+
+lane page
+lane render
+
+rail mid
+
+node app  lane:page   rail:mid name:"your page" inspect:"<b>your page</b> — a static .html with one &lt;script src='dist/flowdot.js'&gt; include"
+node fd   core lane:render rail:mid name:"flowdot.js" inspect:"<b>dist/flowdot.js</b> — the single built bundle: renderer + builder + parser + auto-boot"
+
+edge app -> fd alpha:0.35
+
+# a packet travels your page → the bundle about twice a second (rate:2), pulsing the bundle on arrival
+flow f rate:2 : app ~0.9 fd
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library, PACKAGED: one bundle instead of the four src/*.js tags the other tutorials use.
+     Build it with `npm run build`; vendor the file into your own repo for static/file:// pages. -->
+<script src="../../dist/flowdot.js"></script>
+</body>
+</html>

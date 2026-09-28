@@ -1,0 +1,465 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — playground</title>
+<!-- ZERO authored JavaScript. The library's boot() auto-fills the <select data-flow-picker> from the
+     <script type="text/flow" data-tpl> templates below; choosing one loads its source into the editable
+     panel and the diagram re-mounts. Edit the source and it re-renders live; a bad edit shows the error
+     and keeps the last good diagram. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+<style>
+  .bar{display:flex;gap:10px;align-items:center;margin:0 0 12px}
+  select{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:7px;
+    padding:6px 10px;font:inherit;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot playground</h1>
+  <p class="sub">Pick a bundled example, then <b>edit its <code>.flow</code> source</b> and watch the diagram update. Zero JavaScript — the dropdown and live re-mount are driven entirely by the library.</p>
+
+  <div class="bar"><label for="pick">example:</label>
+    <select id="pick" data-flow-picker="#src"></select></div>
+
+  <!-- the live editor: a normal data-editable diagram; the picker loads sources into its #src panel -->
+  <script type="text/flow" data-flowdot data-editable data-source="#src" data-debounce="80">
+diagram "one source → one worker" 680x240
+
+# two bare lanes on one bare rail — no coordinates, no sizes: the layout
+# auto-distributes the lanes into columns and the rail centres them vertically.
+lane in
+lane out
+
+rail mid
+
+node src  lane:in  rail:mid inspect:"<b>src</b> — the packet source; emits ~2 packets/sec into the edge"
+node dst core lane:out rail:mid name:"Worker" inspect:"<b>Worker</b> — receives every packet from src and pulses on arrival"
+
+edge src -> dst alpha:0.35
+
+# a packet travels src → dst about twice a second (rate:2), pulsing the worker on arrival
+flow f rate:2 : src ~0.9 dst
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+
+  <!-- hidden source templates (no data-flowdot → not mounted; the picker reads their text).
+       These are generated from the example pages and guarded by tools/playground-parity.test.js. -->
+<script type="text/flow" data-tpl="hello-world">
+diagram "one source → one worker" 680x240
+
+# two bare lanes on one bare rail — no coordinates, no sizes: the layout
+# auto-distributes the lanes into columns and the rail centres them vertically.
+lane in
+lane out
+
+rail mid
+
+node src  lane:in  rail:mid inspect:"<b>src</b> — the packet source; emits ~2 packets/sec into the edge"
+node dst core lane:out rail:mid name:"Worker" inspect:"<b>Worker</b> — receives every packet from src and pulses on arrival"
+
+edge src -> dst alpha:0.35
+
+# a packet travels src → dst about twice a second (rate:2), pulsing the worker on arrival
+flow f rate:2 : src ~0.9 dst
+</script>
+<script type="text/flow" data-tpl="auto-layout">
+diagram "Auto-layout — bare lanes (zero coordinates)" 900x420
+
+# LANES with no x/w — the engine splits the width into even columns (GraphViz-lite, deterministic).
+lane producers
+lane broker
+lane consumers
+
+# zones are visual BANDS, not tracks, so they still carry coordinates (aligned to the auto columns).
+zone zp "Producers" x:24  y:40 w:268 h:340
+zone zb "Broker"    x:316 y:40 w:268 h:340
+zone zc "Consumers" x:608 y:40 w:268 h:340
+
+# three producers / consumers with NO rail and NO y → auto-stack evenly DOWN their lane (never overlap).
+each i in 0..2:
+  node p{i} box lane:producers name:"producer-{i}" inspect:"<b>producer-{i}</b> — auto-stacked; no rail or y coordinate — the engine places it"
+  node c{i} box lane:consumers name:"consumer-{i}" inspect:"<b>consumer-{i}</b> — auto-stacked in the consumers lane"
+# a lone node in a lane → centred vertically.
+node hub core lane:broker name:"Broker" inspect:"<b>Broker</b> — lone node in its lane → auto-centred vertically; routes all producers to all consumers"
+
+each i in 0..2:
+  road p{i} ~> hub roadW:12
+  edge hub -> c{i} alpha:0.2
+  flow f{i} rate:2 : p{i} ~0.7 hub ~0.7 c{i}
+</script>
+<script type="text/flow" data-tpl="zones">
+diagram "Zones — visual grouping bands" 900x420
+
+# three bare lanes on one bare rail — the layout auto-distributes them into columns
+lane fe
+lane be
+lane da
+
+rail mid
+
+# zones are labelled bands drawn behind everything — grouping only, no behaviour.
+# each zone just names the lane it spans → it INFERS its box (the lane's column ×
+# a full-height content band). No coordinates.
+zone frontend "Frontend" lane:fe #emerald
+zone backend  "Backend"  lane:be #sky
+zone data     "Data"     lane:da #violet
+
+node ui   lane:fe rail:mid name:"web UI"    inspect:"<b>web UI</b> — frontend zone; user-facing layer that initiates all requests"
+node api core lane:be rail:mid name:"API"   inspect:"<b>API</b> — backend zone; orchestrates requests between UI and database"
+node db   lane:da rail:mid name:"database"  inspect:"<b>database</b> — data zone; zones are visual bands only, no effect on behaviour"
+
+edge ui  -> api alpha:0.25
+edge api -> db  alpha:0.25
+
+flow f rate:2 : ui ~0.7 api ~0.7 db
+</script>
+<script type="text/flow" data-tpl="palette-colors">
+diagram "Colour tokens" 820x300
+
+# all five nodes share one bare rail and no lane, so they auto-spread evenly
+# across it (left-to-right in declaration order) — no coordinates, no sizes.
+rail mid
+
+# a source, three stages coloured from the theme ramp BY INDEX (#series0..2), then a named token
+node src box rail:mid name:"source" #emerald inspect:"<b>source</b> — coloured #emerald; the token maps per theme (toggle to see)"
+each i in 0..2:
+  node s{i} box rail:mid name:"stage {i}" #series{i} inspect:"<b>stage {i}</b> — coloured #series{i}, the theme ramp by index"
+node out box rail:mid name:"sink" #rose    inspect:"<b>sink</b> — coloured #rose; the flow dot is also a theme token"
+
+edge src -> s0 alpha:0.25
+edge s0  -> s1 alpha:0.25
+edge s1  -> s2 alpha:0.25
+edge s2  -> out alpha:0.25
+
+# the flow dot is a theme token too (maps per theme)
+flow f rate:2 #amber : src ~0.6 s0 ~0.6 s1 ~0.6 s2 ~0.6 out
+</script>
+<script type="text/flow" data-tpl="comprehensions">
+diagram "Comprehensions — set, each, {expr}" 760x420
+set names = alpha beta gamma
+
+# three bare lanes (columns) and three bare rails (rows); the grid auto-distributes into them
+lane l0
+lane l1
+lane l2
+
+rail r0
+rail r1
+rail r2
+
+# a 3×3 grid built by nested `each`; the track refs are {interpolated}, the label is a {list index},
+# colour a palette ref — no coordinates or sizes, the layout places each cell
+each r in 0..2:
+  each c in 0..2:
+    node cell{r}{c} box lane:l{c} rail:r{r} name:"{names[c]} · row {r}" #series{c} inspect:"<b>{names[c]}</b> — row {r}, column {c}; colour is #series{c} (theme ramp)"
+
+# a flow animates the middle row (built from interpolated node ids too)
+flow mid rate:2 : cell10 ~0.6 cell11 ~0.6 cell12
+</script>
+<script type="text/flow" data-tpl="flow-pick">
+diagram "Flow pick — weighted 80/20" 800x300
+
+lane inp
+lane mid
+lane out
+
+# bare rails auto-distribute top→bottom in declaration order: accept on top,
+# source/router centred, reject on the bottom
+rail a         # accept
+rail m         # source / router
+rail r         # reject
+
+node src     lane:inp rail:m                     inspect:"<b>src</b> — emits 2 packets/sec; each gets routed by a weighted pick"
+node router core lane:mid rail:m sub:"80 / 20"  inspect:"<b>router</b> — weighted pick: 80% → accept, 20% → reject (seeded random)"
+node accept  lane:out rail:a #emerald            inspect:"<b>accept</b> — ~80% of packets land here (@0.8 weight)"
+node reject  lane:out rail:r #rose               inspect:"<b>reject</b> — ~20% of packets land here (@0.2 weight)"
+
+edge src    -> router alpha:0.22
+edge router -> accept alpha:0.18
+edge router -> reject alpha:0.18
+
+# `|` = weighted pick: one branch per packet, chosen by the @weights
+flow pick rate:2 : src ~0.6 router ~0.55 accept @0.8 | ~0.6 reject @0.2
+</script>
+<script type="text/flow" data-tpl="flow-fanout">
+diagram "Flow fan-out — one publisher, every subscriber" 780x360
+
+lane inp
+lane out
+
+# three bare rails auto-distribute into even bands; the publisher centres on the middle one
+rail top
+rail mid
+rail bot
+
+node pub  core lane:inp rail:mid name:"publisher" inspect:"<b>publisher</b> — fan-out source; every packet is copied to ALL subscribers"
+node subA  lane:out rail:top name:"sub A"         inspect:"<b>sub A</b> — receives a copy of every published packet"
+node subB  lane:out rail:mid name:"sub B"         inspect:"<b>sub B</b> — receives a copy of every published packet"
+node subC  lane:out rail:bot name:"sub C"         inspect:"<b>sub C</b> — receives a copy of every published packet"
+
+edge pub -> subA alpha:0.18
+edge pub -> subB alpha:0.18
+edge pub -> subC alpha:0.18
+
+# `&` = fan-out: a copy of the packet to every branch
+flow fan rate:2 : pub ~0.6 subA & ~0.6 subB & ~0.6 subC
+</script>
+<script type="text/flow" data-tpl="flow-branch">
+diagram "Non-linear flows — pick × fan-out" 900x500
+
+# bare lanes auto-distribute into columns. the rails keep explicit y: this diagram has TWO
+# zone bands (pick on top, fan-out below), and the rail rows must align to those bands —
+# a case where even auto-distribution can't guess the grouping, so the y's are intentional.
+lane inp
+lane mid
+lane out
+
+rail am 150     # source / router  (weighted pick, top band)
+rail a0 110     # accept
+rail a1 200     # reject
+rail fm 370     # publisher / sub B (fan-out, bottom band)
+rail f0 310     # sub A
+rail f2 430     # sub C
+
+# bands (zones keep coordinates, aligned to the rail rows above)
+zone zp "weighted pick — a filter (80% accept · 20% reject)" x:32  y:70  w:836 h:180
+zone zf "fan-out — one publisher, every subscriber gets a copy" x:32 y:270 w:836 h:200
+
+# pick: source → router → { accept 0.8 | reject 0.2 }
+node src     lane:inp rail:am                    inspect:"<b>source</b> — emits requests at rate:2 into the pick router"
+node router core lane:mid rail:am sub:"80 / 20" inspect:"<b>router</b> — weighted pick: 80% → accept, 20% → reject"
+node accept  lane:out rail:a0 #emerald           inspect:"<b>accept</b> — ~80% of packets land here (weighted pick @0.8)"
+node reject  lane:out rail:a1 #rose              inspect:"<b>reject</b> — ~20% of packets land here (weighted pick @0.2)"
+
+edge router -> accept alpha:0.18
+edge router -> reject alpha:0.18
+edge src -> router alpha:0.22
+
+flow pick rate:2 : src ~0.6 router ~0.55 accept @0.8 | ~0.6 reject @0.2
+
+# fan-out: publisher → { sub A & sub B & sub C }
+node pub  core lane:mid rail:fm name:"publisher"  inspect:"<b>publisher</b> — fan-out source; one publish reaches ALL subscribers"
+node subA  lane:out rail:f0 name:"sub A"          inspect:"<b>sub A</b> — receives a copy of every published packet"
+node subB  lane:out rail:fm name:"sub B"          inspect:"<b>sub B</b> — receives a copy of every published packet"
+node subC  lane:out rail:f2 name:"sub C"          inspect:"<b>sub C</b> — receives a copy of every published packet"
+
+edge pub -> subA alpha:0.18
+edge pub -> subB alpha:0.18
+edge pub -> subC alpha:0.18
+
+flow fan rate:2 : pub ~0.6 subA & ~0.55 subB & ~0.6 subC
+</script>
+<script type="text/flow" data-tpl="flow-actions">
+diagram "Flow actions — count & push" 720x320
+
+node producer   lane:src rail:r0 inspect:"<b>producer</b> — emits 2 packets/sec into the road"
+node processor core lane:eng rail:r0 inspect:"<b>processor</b> — on each arrival: count processed; push queue (updates runtime store)"
+
+road producer ~> processor
+
+# on arrival at the processor: bump the `processed` counter and the `queue` ring depth.
+# these verbs mutate the runtime state store (no host JS) — see rt.store in the console.
+flow f rate:2 : producer ~0.8 processor { count processed; push queue }
+</script>
+<script type="text/flow" data-tpl="flow-schedule">
+diagram "Flow schedule — spawn & after" 760x320
+
+node client  lane:l rail:row inspect:"<b>client</b> — sends 1 request/sec; also receives the spawned response packet"
+node server core lane:r rail:row inspect:"<b>server</b> — handles each request: counts it, spawns a response, schedules a timeout event"
+
+road client ~> server
+
+# request travels client → server; on arrival the server:
+#   • count handled            — bump a counter in the runtime store
+#   • spawn server ~0.6 client — emit a SECONDARY packet (the response, travelling back)
+#   • after 0.5: timeout       — schedule the named `timeout` event 0.5s later (handler via `on`)
+flow req rate:1 : client ~0.7 server { count handled; spawn server ~0.6 client; after 0.5: timeout }
+</script>
+<script type="text/flow" data-tpl="flow-events">
+diagram "Flow events — on & drop if" 820x320
+seed 12345
+
+node source  lane:l rail:row inspect:"<b>source</b> — emits 2 requests/sec; ~20% will be dropped at the gate"
+node gate   core lane:m rail:row inspect:"<b>gate</b> — drops ~20% (rand() &lt; 0.2); accepted packets schedule an audit event"
+node sink    lane:r rail:row inspect:"<b>sink</b> — receives accepted packets; each triggers an audit event 0.3s later"
+
+road source ~> gate
+edge gate -> sink alpha:0.2
+
+# at the gate: count every arrival, then drop ~20% (rand()<0.2) — dropped packets never reach the sink.
+# accepted packets continue; on arrival at the sink they schedule an `audit` event 0.3s later.
+flow req rate:2 : source ~0.6 gate { count seen; drop if rand() < 0.2 } ~0.6 sink { after 0.3: audit }
+
+# the named handler: runs whenever an `audit` event fires.
+on audit: count audited
+</script>
+<script type="text/flow" data-tpl="periodics">
+diagram "Periodics — tiered drainers" 780x380
+
+lane src
+lane out
+
+rail t1
+rail t2
+rail t3
+
+node buffer core lane:src rail:t2                  inspect:"<b>buffer</b> — drained by all three tiers at their own rates"
+node fast box lane:out rail:t1 name:"tier 1 · every 0.4s" inspect:"<b>tier 1</b> — fastest drainer; fires every 0.4s"
+node med  box lane:out rail:t2 name:"tier 2 · every 1s"   inspect:"<b>tier 2</b> — medium drainer; fires every 1s"
+node slow box lane:out rail:t3 name:"tier 3 · every 2s"   inspect:"<b>tier 3</b> — slowest drainer; fires every 2s"
+
+edge buffer -> fast alpha:0.15
+edge buffer -> med  alpha:0.15
+edge buffer -> slow alpha:0.15
+
+# three drainers, each on its own timer. `per _ in [0]` runs a single drainer once per tick;
+# each `spawn` sends a packet from the buffer to that tier's subscriber, and `count` tallies drains.
+every 0.4 per _ in [0] : count t1; spawn buffer ~0.3 fast
+every 1   per _ in [0] : count t2; spawn buffer ~0.6 med
+every 2   per _ in [0] : count t3; spawn buffer ~0.9 slow
+</script>
+<script type="text/flow" data-tpl="modes">
+diagram "Modes — a storm toggle" 720x340
+
+# a burst mode: while active, sources spawn 4× faster (rate 1/s → 4/s)
+mode storm: spawn x4
+
+node producer box lane:src rail:r0 inspect:"<b>producer</b> — emits 1 packet/sec normally; 4/sec in storm mode"
+node consumer box lane:dst rail:r0 inspect:"<b>consumer</b> — receives all packets; toggle storm to feel the surge"
+
+road producer ~> consumer
+
+flow f rate:1 : producer ~0.8 consumer
+</script>
+<script type="text/flow" data-tpl="branded">
+diagram "Acme — service mesh" 820x340 light
+
+# bare tracks — the theme is the whole point here, so layout leans entirely on the defaults
+lane edge
+lane core
+lane data
+
+rail top
+rail mid
+rail bot
+
+node gw    core lane:edge rail:mid name:"gateway" inspect:"<b>gateway</b> — entry point; routes every request to the API"
+node auth   lane:core rail:top #amber            inspect:"<b>auth</b> — verifies credentials on the #amber path"
+node api   core lane:core rail:mid #azure        inspect:"<b>API</b> — orchestrates auth, cache, and database calls"
+node cache  lane:core rail:bot #mint             inspect:"<b>cache</b> — serves hot data; reduces DB load"
+node db     lane:data rail:mid name:"database" #azure inspect:"<b>database</b> — persistent storage; reached on cache miss"
+
+edge gw  -> api   alpha:0.22
+edge api -> auth  alpha:0.16
+edge api -> cache alpha:0.16
+edge api -> db    alpha:0.22
+
+# a request flows gateway → api → database
+flow req rate:2 #amber : gw ~0.5 api ~0.5 db
+</script>
+<script type="text/flow" data-tpl="message-queue-backpressure">
+diagram "Message-queue backpressure" 860x360
+
+# burst mode: while active, both producers fire 3× faster → the queue saturates and drop-if sheds load
+mode burst: spawn x3
+
+# three bare lanes: producers | (queue) | consumer. the empty middle lane reserves the centre
+# column so the queue ring can centre there via the rail (a ring sizes its own box, so it stays
+# laneless — no lane-fill — and auto-centres on the mid rail).
+lane prod
+lane qcol
+lane cons
+
+rail top
+rail mid
+rail bot
+
+node p1      lane:prod rail:top name:"producer 1" inspect:"<b>producer 1</b> — enqueues packets; drops on arrival if queue ≥ 12"
+node p2      lane:prod rail:bot name:"producer 2" inspect:"<b>producer 2</b> — enqueues packets; drops on arrival if queue ≥ 12"
+node queue  ring rail:mid slots:12 label:"queue"  inspect:"<b>queue</b> — ring buffer (12 slots); fill = live depth. Toggle burst to saturate."
+node worker core lane:cons rail:mid name:"consumer" inspect:"<b>consumer</b> — drains one item every 0.5s via a periodic every handler"
+
+edge p1    -> queue  alpha:0.18
+edge p2    -> queue  alpha:0.18
+edge queue -> worker alpha:0.18
+
+# one producer is chosen per tick with `pick p in [p1, p2]`; `{p}` interpolates the picked node id as
+# the flow's origin. On arrival at the queue: if it is full (depth >= its 12 slots) `drop` the packet
+# (backpressure — it never enters the ring), else `push` it (ring fill ++) and tally an enqueue.
+# `count produced` at the origin tallies every attempt (produced - enqueued = dropped).
+flow f rate:1 pick p in [p1, p2] : {p} { count produced } ~0.5 queue { drop if queue >= 12; push queue; count enqueued }
+
+# the consumer: once per tick, drain one item from the queue whenever it is non-empty (ring fill --)
+every 0.5 per _ in [0] when queue > 0 : drain queue; count consumed
+</script>
+<script type="text/flow" data-tpl="pubsub-tiered">
+diagram "Pub/sub — tiered conflation" 900x380
+
+lane pubL
+lane subL
+
+rail top
+rail mid
+rail bot
+
+node pub  core lane:pubL rail:mid name:"publisher" sub:"last-value" inspect:"<b>publisher</b> — writes vFast/vMed/vSlow slots at rate:3; overwrites unconsumed = conflation"
+node fast  lane:subL rail:top name:"fast · every 0.4s" inspect:"<b>fast</b> — polls every 0.4s; keeps up with the publisher (little conflation)"
+node med   lane:subL rail:mid name:"medium · every 1s"  inspect:"<b>medium</b> — polls every 1s; misses some updates (some conflation)"
+node slow  lane:subL rail:bot name:"slow · every 2s"    inspect:"<b>slow</b> — polls every 2s; reads only the latest of many updates (heavy conflation)"
+
+edge pub -> fast alpha:0.15
+edge pub -> med  alpha:0.15
+edge pub -> slow alpha:0.15
+
+# the publisher updates each tier's last-value slot on every tick (fast). `count published` tallies
+# updates; each `write` marks that tier's slot dirty — overwriting a slot the tier has not yet read
+# SUPERSEDES the old value (conflation, tallied in rt.store.superseded). `&` fans the publish out to
+# all three subscribers at once.
+flow pub rate:3 : pub { count published; write vFast = published; write vMed = published; write vSlow = published } ~0.3 fast & ~0.6 med & ~0.9 slow
+
+# each tier polls at its own rate and consumes the latest value ONLY when its slot is dirty (unread).
+# the fast tier keeps up (little conflation); the slow tier sees only the latest of many updates.
+every 0.4 per _ in [0] when dirty(vFast) : clean vFast; count readFast
+every 1   per _ in [0] when dirty(vMed)  : clean vMed;  count readMed
+every 2   per _ in [0] when dirty(vSlow) : clean vSlow; count readSlow
+</script>
+<script type="text/flow" data-tpl="request-retry">
+diagram "Request / retry" 880x360
+seed 0x2024
+
+lane cl
+lane sv
+lane rs
+
+rail top
+rail mid
+rail bot
+
+node client  lane:cl rail:mid inspect:"<b>client</b> — drops ~5% of requests; sends the rest to the server at rate:1"
+node server core lane:sv rail:mid sub:"75 / 25" inspect:"<b>server</b> — routes 75% to ok (spawns ack) or 25% to fail (schedules retry after 0.6s)"
+node ok      lane:rs rail:top #emerald inspect:"<b>ok</b> — success path (75%); server spawns an ack packet back to the client"
+node fail    lane:rs rail:bot #rose    inspect:"<b>fail</b> — failure path (25%); triggers a retry event 0.6s later via after"
+
+edge client -> server alpha:0.22
+edge server -> ok   alpha:0.16
+edge server -> fail alpha:0.16
+
+# each request travels client → server, where a weighted `pick` chooses one outcome:
+#   ok  (75%) → the server `spawn`s an ack packet back to the client, and tallies `ok`
+#   fail(25%) → schedule the `retry` event 0.6s later (via `after`), and tally `failed`
+flow req rate:1 : client { count requests; drop if rand() < 0.05 } ~0.6 server ~0.55 ok @0.75 { spawn server ~0.6 client; count ok } | ~0.55 fail @0.25 { after 0.6: retry; count failed }
+
+# the retry handler: fired 0.6s after a failure — re-issue the request (a fresh client → server packet)
+on retry: count retried; spawn client ~0.6 server
+</script>
+</div>
+
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

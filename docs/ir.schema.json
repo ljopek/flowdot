@@ -142,6 +142,8 @@
           "enum": [
             "box",
             "core",
+            "slot",
+            "readout",
             "ring",
             "matrix",
             "pipeline"
@@ -174,6 +176,7 @@
               "rail": {},
               "align": {},
               "inset": {},
+              "decay": {},
               "name": {},
               "sub": {},
               "accent": {}
@@ -206,10 +209,82 @@
               "rail": {},
               "align": {},
               "inset": {},
+              "decay": {},
               "name": {},
               "sub": {},
               "accent": {},
-              "lit": {}
+              "lit": {},
+              "idle": {},
+              "owns": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "slot"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "decay": {},
+              "name": {},
+              "accent": {},
+              "value": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "readout"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "id": {},
+              "kind": {},
+              "x": {},
+              "y": {},
+              "w": {},
+              "h": {},
+              "inspect": {},
+              "hoverable": {},
+              "lane": {},
+              "rail": {},
+              "align": {},
+              "inset": {},
+              "decay": {},
+              "watch": {},
+              "name": {},
+              "label": {},
+              "unit": {},
+              "accent": {},
+              "value": {}
             },
             "additionalProperties": false
           }
@@ -239,6 +314,7 @@
               "rail": {},
               "align": {},
               "inset": {},
+              "decay": {},
               "slots": {},
               "r": {},
               "color": {},
@@ -272,6 +348,7 @@
               "rail": {},
               "align": {},
               "inset": {},
+              "decay": {},
               "rows": {},
               "cols": {},
               "cw": {},
@@ -312,6 +389,7 @@
               "rail": {},
               "align": {},
               "inset": {},
+              "decay": {},
               "stages": {},
               "nodeR": {},
               "idle": {},

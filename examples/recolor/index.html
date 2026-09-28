@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — per-kind colour override (brand every kind)</title>
+<!-- ZERO authored JavaScript. One `colors <kind>:#token …` line recolours EVERY component kind at
+     once (layered over the dark theme) — no per-node colours needed. An inline `#token` on a single
+     node still wins locally. Every colour is a `#` token, so the dark↔light toggle re-maps them all.
+     Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>per-kind colour override</h1>
+  <p class="sub">A single <code>colors box:#sky core:#violet …</code> line sets a colour <b>per component kind</b> for the whole diagram — layered over the theme, so no node needs its own colour. One node still carries an <b>inline</b> <code>#bronze</code> that <b>wins locally</b>. All are <code>#</code> tokens → toggle to re-map the lot.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-editable data-source="#src">
+diagram "Recolour every kind from one line" 960x360
+theme-toggle
+
+# ONE line brands every kind (box/core/ring/pipeline/zone/road/edge), layered over the dark theme:
+colors box:#sky core:#violet ring:#amber pipeline:#emerald zone:#azure road:#rose edge:#mint
+
+# bare tracks — 3 columns × 2 rows, auto-distributed (no coordinates).
+lane in
+lane mid
+lane out
+
+rail top
+rail low
+
+# a zone spanning the middle column (its colour comes from `colors zone:#azure`).
+zone sys "service" lane:mid
+
+node ingress  lane:in  rail:top inspect:"<b>ingress</b> — box kind; colour comes from <code>colors box:#sky</code>"                                     # box   → #sky
+node router  core     lane:mid rail:top inspect:"<b>router</b> — core kind; colour comes from <code>colors core:#violet</code>"                                     # core  → #violet
+node q       ring     lane:mid rail:low slots:8 label:"queue" inspect:"<b>queue</b> — ring kind (8 slots); colour from <code>colors ring:#amber</code>"            # ring  → #amber
+node worker  pipeline lane:out rail:top boxed vertical stages:[recv, work, ack] h:96 inspect:"<b>worker</b> — pipeline kind; colour from <code>colors pipeline:#emerald</code>"
+node audit    lane:out rail:low #bronze inspect:"<b>audit</b> — inline #bronze overrides the per-kind colour from colors"                             # INLINE #bronze wins over box:#sky
+
+road ingress ~> router     # road → #rose
+edge router  -> q          # edge → #mint
+road q       ~> worker     # road → #rose
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

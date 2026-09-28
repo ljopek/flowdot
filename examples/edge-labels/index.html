@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — edge labels &amp; semantic styles</title>
+<!-- ZERO authored JavaScript. Edges (`->`) can carry a `label:"…"` chip, a bare `dashed` flag (async /
+     lossy), and a `#rose` tint (an error path). An unknown edge key now throws a loud, located error
+     instead of being silently ignored. data-source mirrors the source below. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>edge labels &amp; semantic styles</h1>
+  <p class="sub">A thin <code>edge -&gt;</code> can now carry a <b>label</b> chip, a bare <code>dashed</code> flag (async / lossy), and a <code>#rose</code> tint (an error path) — the vocabulary an architecture doc lives on. An unknown edge key throws a loud error.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Edge labels &amp; semantic styles" 860x360
+theme-toggle
+
+lane l
+lane m
+lane r
+
+rail top
+rail bot
+
+node client  lane:l rail:top name:"client"      #sky     inspect:"<b>client</b> — initiates synchronous gRPC requests"
+node api    core lane:m rail:top name:"API"              inspect:"<b>API</b> — routes requests; labels the edges with their protocol and semantics"
+node cache   lane:r rail:top name:"cache"        #emerald inspect:"<b>cache</b> — cache-aside; dashed edge = async / lossy write-behind"
+node dlq     lane:r rail:bot name:"dead-letter"  #rose   inspect:"<b>dead-letter</b> — captures failed requests; #rose dashed edge = error path"
+
+# a labelled edge rides a chip at its midpoint; `dashed` = async/lossy; `#rose` tints an error path.
+edge client -> api   label:"gRPC · sync"   alpha:0.4
+edge api    -> cache label:"cache-aside"   dashed alpha:0.4
+edge api    -> dlq   label:"on error"      #rose dashed alpha:0.55
+
+flow f rate:2 #sky : client ~0.6 api ~0.6 cache
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

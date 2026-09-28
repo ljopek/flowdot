@@ -1,10 +1,13 @@
 {
   "name": "flowdot",
-  "version": "0.7.0",
-  "description": "A tiny framework + language for animated architecture / data-flow diagrams on HTML canvas 2D.",
+  "version": "0.8.0",
+  "description": "A compact language for animated data-flow diagrams on HTML canvas.",
   "type": "commonjs",
   "private": false,
   "license": "MIT",
+  "bin": {
+    "flowdot": "bin/flowdot.js"
+  },
   "main": "dist/flowdot.cjs",
   "module": "dist/flowdot.mjs",
   "exports": {
@@ -22,12 +25,13 @@
   "unpkg": "dist/flowdot.min.js",
   "jsdelivr": "dist/flowdot.min.js",
   "files": [
+    "bin",
     "dist",
     "docs",
     "examples",
+    "llms.txt",
     "README.md",
     "CHANGELOG.md",
-    "CONTRIBUTING.md",
     "LICENSE"
   ],
   "repository": {

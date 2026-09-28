@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — heartbeat & window (time-as-event)</title>
+<!-- Time as a value. `now()` is the runtime clock, so a diagram can react to SILENCE with no host
+     timer: data arrivals stamp `set lastSeen = now()`, a heartbeat rides its own track with a distinct
+     token, and a window-boundary emission fires only after a silent window (`when now() - lastSeen >= W`),
+     re-arming each time. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — heartbeat &amp; window</h1>
+  <p class="sub"><code>now()</code> is the runtime clock — <b>time as a value</b>. Data arrivals stamp
+    <code>set lastSeen = now()</code>; a <span style="color:#8f7bff">heartbeat</span> rides its own track
+    every 1s; and a <span style="color:#ff9db1">window boundary</span> fires only after a silent window
+    (<code>when now() - lastSeen &gt;= 1.2</code>), re-arming each time. No host timer, no JS.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "heartbeat & window — react to silence with now() (no JS)" 720x300
+
+node src   core x:40  y:56  w:110 h:48 name:"producer" inspect:"<b>producer</b> — sends data sporadically (every ~2s); each arrival stamps lastSeen = now()"
+node sink  box  x:320 y:58  w:130 h:44 name:"consumer" inspect:"<b>consumer</b> — on arrival: set lastSeen = now(); count seen"
+node beat  core x:40  y:186 w:110 h:48 idle owns:"clock" name:"heartbeat" inspect:"<b>heartbeat</b> — rides its own track every 1s with a distinct token, so liveness shows even during silence"
+node mon   box  x:320 y:188 w:130 h:44 name:"monitor" inspect:"<b>monitor</b> — receives heartbeats and window-boundary emissions"
+node bound box  x:560 y:120 w:130 h:44 #rose name:"window boundary" inspect:"<b>window boundary</b> — fires only after 1.2s of silence, then re-arms (time-as-event)"
+
+edge src -> sink alpha:0.25
+edge beat -> mon alpha:0.2
+edge bound -> mon alpha:0.2
+
+seed 0x51F0
+# data arrivals stamp the clock; between them, silence grows
+flow data rate:0.5 : src ~0.3 sink { set lastSeen = now(); count seen }
+# a heartbeat rides its own track with a distinct token (#series2), independent of data
+every 1 per _ in [0] : spawn beat ~0.4 mon #series2
+# window-boundary emission: after 1.2s of no data, emit once and re-arm — a silence watchdog, no timer thread
+every 0.3 per _ in [0] when now() - lastSeen >= 1.2 : set lastSeen = now(); count windows; spawn bound ~0.4 mon #rose
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

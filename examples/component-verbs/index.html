@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — component verbs</title>
+<!-- Hop actions can call a component's own methods, not just mutate the store. `highlight m.row:i`
+     rings a matrix row (the "reader touches a row" moment), `down/up m.col:j` marks a column down/up,
+     and `surge <ring>` floods a lane. Here a reader picks a row each fire, writes its cell, and
+     highlights the whole row. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — component verbs</h1>
+  <p class="sub">hop actions can call a component's methods: <code>highlight m.row:i</code>,
+    <code>down</code>/<code>up m.col:j</code>, <code>surge ring</code>. Here each read
+    <code>pick</code>s a row, writes its cell, and <code>highlight</code>s the whole row — the moment a
+    reader sweeps a row.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "component verbs — highlight the row a reader touches (no JS)" 640x300
+seed 5
+
+node reader box x:34 y:120 w:120 h:48 name:"reader" inspect:"<b>reader</b> — each read picks a row, writes its cell, and highlights the whole row"
+node grid matrix x:250 y:56 w:156 h:176 rows:3 cols:2 decay:0.5 title:"cache" subtitle:"read row i → highlight it" inspect:"<b>cache</b> — <code>highlight grid.row:{i}</code> rings the row the reader touched; the written cell decays"
+
+edge reader -> grid alpha:0.3
+
+# each fire picks a row, writes that cell (F6 payload), then highlights the whole row (F5 method verb).
+flow f rate:1.6 pick i in [0,1,2] : reader ~0.5 grid { write grid.{i}.0 = 1; highlight grid.row:{i} }
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

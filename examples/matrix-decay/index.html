@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — matrix decay</title>
+<!-- A matrix whose cells FADE. `write m.i.j` lights a cell (fresh:1); a `decay:<rate>` on the matrix
+     lowers freshness every frame so a cell that stops being refreshed fades back to idle — no host
+     JavaScript, no per-frame js{} escape. Without `decay:` a written cell would latch ON forever.
+     ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — matrix decay</h1>
+  <p class="sub">a <code>matrix</code> with <code>decay:0.6</code> — each <code>write&nbsp;m.i.j</code>
+    lights a cell, and it <b>fades back to idle</b> on its own when the writer slows down. No JS: the
+    fade is declarative. (Remove <code>decay:</code> and every written cell latches on forever.)</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "matrix decay — a written cell fades back to idle (no JS)" 640x300
+
+node w0 box x:40 y:70  w:130 h:48 name:"writer A" inspect:"<b>writer A</b> — refreshes the top-left cell about 0.8×/sec"
+node w1 box x:40 y:184 w:130 h:48 name:"writer B" inspect:"<b>writer B</b> — refreshes the bottom-right cell about 0.4×/sec (slower → its cell spends more time faded)"
+
+# decay:0.6 = freshness drops 0.6/second every frame; a cell reaches idle ~1.7s after its last write.
+node m matrix x:330 y:74 w:156 h:116 rows:2 cols:2 decay:0.6 title:"cache" subtitle:"a cell fades to idle unless refreshed" inspect:"<b>cache</b> — a last-value grid; cells lit by a <code>write</code> decay back to idle via <code>decay:0.6</code>, with no host JS"
+
+edge w0 -> m.colTop:0 alpha:0.3
+edge w1 -> m.colTop:1 alpha:0.3
+
+# each packet arrival runs a hop action that writes one literal cell (fresh:1); decay does the rest.
+flow a rate:0.8 : w0 ~0.6 m { write m.0.0 = 1 }
+flow b rate:0.4 : w1 ~0.6 m { write m.1.1 = 2 }
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

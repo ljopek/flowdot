@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — orthogonal routing (elbow edges)</title>
+<!-- Edges and roads are straight (a soft bezier) by DEFAULT. Add `route:ortho` (or `route:elbow`) to an
+     `edge`/`road` and it bends at right angles through the midpoint instead of cutting diagonally —
+     so wires in a packed layout read as clean orthogonal buses. Opt-in; straight stays the default.
+     ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — orthogonal routing</h1>
+  <p class="sub">edges are a soft bezier by default; add <code>route:ortho</code> to an <code>edge</code>
+    or <code>road</code> and it bends at <b>right angles</b> through the midpoint — clean orthogonal
+    wires that don't cut diagonally across a packed layout. Opt-in; straight stays default. No host JS.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "orthogonal routing — right-angle wires (opt-in, no JS)" 720x340
+
+node bus core x:300 y:150 w:120 h:56 name:"bus" inspect:"<b>bus</b> — a central hub wired to every corner with orthogonal edges"
+node n0 box x:40  y:40  w:120 h:44 name:"NW" inspect:"<b>NW</b> — reached by a right-angle edge, not a diagonal"
+node n1 box x:560 y:40  w:120 h:44 name:"NE"
+node n2 box x:40  y:250 w:120 h:44 name:"SW"
+node n3 box x:560 y:250 w:120 h:44 name:"SE"
+
+# right-angle edges to each corner — they bend through the midpoint instead of cutting across
+edge bus -> n0 route:ortho alpha:0.5
+edge bus -> n1 route:ortho alpha:0.5
+edge bus -> n2 route:ortho alpha:0.5
+edge bus -> n3 route:ortho alpha:0.5
+
+# a packet rides the bus and pulses the edge along its elbow
+flow f rate:1.5 : bus ~0.5 n0 & ~0.5 n1 & ~0.5 n2 & ~0.5 n3
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

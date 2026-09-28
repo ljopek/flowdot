@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — message-queue backpressure</title>
+<!-- ZERO authored JavaScript. A complex tutorial combining four behaviour features: `flow` + hop
+     `{ actions }` enqueue onto a `ring` (its fill IS the live queue depth), `drop if queue >= cap`
+     sheds load when the queue is full (backpressure), a `mode` burst makes producers outrun the
+     consumer, and `count` tallies produced/enqueued/consumed in the state store. The consumer is a
+     periodic `every … when queue > 0` drainer. data-source mirrors the source below. Opens file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>message-queue backpressure — drop-if, modes, queue depth</h1>
+  <p class="sub">Each tick a producer is chosen with <code>pick p in [p1, p2]</code> and enqueues onto a bounded <code>queue</code> (the ring's fill is the live depth). On arrival <code>drop if queue &gt;= 12</code> sheds load when full; the consumer <code>drain</code>s one per tick. Toggle <b>burst</b> below to make the producer outrun the consumer and watch the ring pin full and start dropping. Counts: <code>document.querySelector('canvas').__flowdot.rt.store</code>.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Message-queue backpressure" 860x360
+
+# burst mode: while active, both producers fire 3× faster → the queue saturates and drop-if sheds load
+mode burst: spawn x3
+
+# three bare lanes: producers | (queue) | consumer. the empty middle lane reserves the centre
+# column so the queue ring can centre there via the rail (a ring sizes its own box, so it stays
+# laneless — no lane-fill — and auto-centres on the mid rail).
+lane prod
+lane qcol
+lane cons
+
+rail top
+rail mid
+rail bot
+
+node p1      lane:prod rail:top name:"producer 1" inspect:"<b>producer 1</b> — enqueues packets; drops on arrival if queue ≥ 12"
+node p2      lane:prod rail:bot name:"producer 2" inspect:"<b>producer 2</b> — enqueues packets; drops on arrival if queue ≥ 12"
+node queue  ring rail:mid slots:12 label:"queue"  inspect:"<b>queue</b> — ring buffer (12 slots); fill = live depth. Toggle burst to saturate."
+node worker core lane:cons rail:mid name:"consumer" inspect:"<b>consumer</b> — drains one item every 0.5s via a periodic every handler"
+
+edge p1    -> queue  alpha:0.18
+edge p2    -> queue  alpha:0.18
+edge queue -> worker alpha:0.18
+
+# one producer is chosen per tick with `pick p in [p1, p2]`; `{p}` interpolates the picked node id as
+# the flow's origin. On arrival at the queue: if it is full (depth >= its 12 slots) `drop` the packet
+# (backpressure — it never enters the ring), else `push` it (ring fill ++) and tally an enqueue.
+# `count produced` at the origin tallies every attempt (produced - enqueued = dropped).
+flow f rate:1 pick p in [p1, p2] : {p} { count produced } ~0.5 queue { drop if queue >= 12; push queue; count enqueued }
+
+# the consumer: once per tick, drain one item from the queue whenever it is non-empty (ring fill --)
+every 0.5 per _ in [0] when queue > 0 : drain queue; count consumed
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — outcome demux (typed-packet styling)</title>
+<!-- A packet's FATE drives its colour and which node flashes. A `pick` binds a value per fire; a
+     guarded `|` demux routes each packet by that value (a sign-bit demux), and a `#colour` on each
+     branch recolours the packet to signal its outcome — emitted (emerald), stale (amber), suppressed
+     (rose). The destination node flashes on arrival. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — outcome demux</h1>
+  <p class="sub">a packet's <b>fate</b> drives its colour. <code>pick q</code> binds a value per fire; a
+    guarded <code>|</code> demux routes by its sign, and a <code>#colour</code> on each branch recolours
+    the packet — <span style="color:#5ef2a0">emitted</span>, <span style="color:#f2cc60">stale</span>,
+    <span style="color:#ff9db1">suppressed</span>. The matching node flashes on arrival. No host JS.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "outcome demux — a packet's fate drives its colour + node (no JS)" 720x300
+
+node feed core x:40  y:120 w:110 h:52 name:"feed" inspect:"<b>feed</b> — emits a tick carrying a quality value q each fire"
+node blend box x:230 y:122 w:110 h:48 name:"blend" inspect:"<b>blend</b> — the demux point: q&gt;0 emit, q==0 stale, q&lt;0 suppress"
+node emitted    box x:470 y:40  w:190 h:44 #emerald name:"EMITTED" inspect:"<b>EMITTED</b> — q&gt;0: a fresh value, packet coloured emerald"
+node stale      box x:470 y:122 w:190 h:44 #amber   name:"EMITTED_STALE_LEG" inspect:"<b>EMITTED_STALE_LEG</b> — q==0: emitted on a stale leg, packet amber"
+node suppressed box x:470 y:204 w:190 h:44 #rose    name:"SUPPRESSED_STALE" inspect:"<b>SUPPRESSED_STALE</b> — q&lt;0: dropped, packet rose"
+
+edge blend -> emitted alpha:0.22
+edge blend -> stale alpha:0.22
+edge blend -> suppressed alpha:0.22
+
+# a sign-bit demux: each packet carries q; the branch it takes (and its colour) is its outcome
+seed 0x51F0
+flow ticks rate:2 pick q in [1,1,1,0,-1] : feed ~0.5 blend ~0.5 emitted #emerald when q > 0 | ~0.5 stale #amber when q == 0 | ~0.5 suppressed #rose when q < 0
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — conflating fan-out (a slot per subscriber)</title>
+<!-- ONE conflation buffer per subscriber, not a shared "fanout box". A `slot` node holds the LAST
+     value written, shows a pending dot while un-read (dirty), and FLASHES "superseded" when a new
+     value overwrites a still-un-read one — the conflation moment (latest-wins). A fast publisher
+     writes all three slots; each reader drains its own at its own pace, so the slow readers visibly
+     conflate (supersede) while the fast one keeps up. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — conflating fan-out</h1>
+  <p class="sub">a <code>slot</code> is <b>one last-value buffer per subscriber</b>. The publisher
+    <code>write</code>s the newest value into every slot; each reader <code>clean</code>s its own at
+    its own rate. A slot flashes <b>"superseded"</b> when a new value overwrites one the reader hasn't
+    taken yet — so the slow readers conflate while the fast one keeps up. No host JS.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "per-subscriber conflation — one last-value slot each (no JS)" 720x320
+
+node pub core x:60  y:132 w:130 h:56 name:"publisher" inspect:"<b>publisher</b> — writes the newest sequence number into every subscriber's slot, 3×/sec"
+node s0 slot x:340 y:44  w:170 h:56 name:"fast reader" inspect:"<b>fast reader</b> — cleans its slot every 0.5s, so it keeps up: rarely superseded"
+node s1 slot x:340 y:132 w:170 h:56 name:"slow reader" inspect:"<b>slow reader</b> — cleans every 1.5s: the publisher overwrites its slot before it reads → superseded"
+node s2 slot x:340 y:220 w:170 h:56 name:"idle reader" inspect:"<b>idle reader</b> — cleans every 3s: conflates hardest, most values superseded"
+
+edge pub -> s0 alpha:0.3
+edge pub -> s1 alpha:0.3
+edge pub -> s2 alpha:0.3
+
+# a fast publisher writes the newest value into every subscriber's slot (a per-subscriber conflation buffer)
+flow ticks rate:3 : pub { count seq } ~0.5 s0 { write s0 = seq } & ~0.5 s1 { write s1 = seq } & ~0.5 s2 { write s2 = seq }
+
+# each reader drains its OWN slot at its own pace — a slower reader's un-read value gets superseded
+every 0.5 per _ in [0] when dirty(s0) : clean s0
+every 1.5 per _ in [0] when dirty(s1) : clean s1
+every 3   per _ in [0] when dirty(s2) : clean s2
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

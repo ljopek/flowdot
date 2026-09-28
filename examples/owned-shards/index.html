@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — owned shards (lit-but-idle cores)</title>
+<!-- A pinned `core` gains two shard affordances so no page-JS custom kind is needed: `idle` renders
+     the lit border at a calm RESTING intensity (owns its data, but at rest — between bright-lit and
+     off), and `owns:"P0"` draws a small ownership caption. A bright-lit router fans keys to three
+     idle-but-lit owned shards. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — owned shards</h1>
+  <p class="sub">a pinned <code>core</code> with <code>idle</code> renders <b>lit-but-idle</b> — the
+    border glows at a calm resting intensity (it owns its data, but is at rest), distinct from a
+    bright-lit core and from an off one. <code>owns:"P0"</code> adds an ownership caption. The
+    bright router fans keys to whichever shard owns the partition. No host JS, no custom kind.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "owned shards — lit-but-idle cores with an owns label (no JS)" 720x320
+
+node rt core x:60  y:130 w:130 h:60 name:"router" inspect:"<b>router</b> — bright-lit (active): fans each key to the shard that owns its partition"
+node s0 core x:360 y:38  w:160 h:60 idle owns:"P0" name:"shard 0" inspect:"<b>shard 0</b> — lit-but-idle: owns partition P0, at rest until a key for P0 arrives"
+node s1 core x:360 y:130 w:160 h:60 idle owns:"P1" name:"shard 1" inspect:"<b>shard 1</b> — lit-but-idle: owns partition P1"
+node s2 core x:360 y:222 w:160 h:60 idle owns:"P2" name:"shard 2" inspect:"<b>shard 2</b> — lit-but-idle: owns partition P2"
+
+edge rt -> s0 alpha:0.25
+edge rt -> s1 alpha:0.25
+edge rt -> s2 alpha:0.25
+
+# each key picks a partition; the packet routes to the shard that owns it (templated node id s{p})
+seed 0x51F0
+flow keys rate:2 pick p in [0,1,2] : rt ~0.6 s{p}
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

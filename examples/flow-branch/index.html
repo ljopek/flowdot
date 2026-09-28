@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — non-linear flows (pick / fan-out)</title>
+<!-- A FULLY DECLARATIVE, ZERO-JS diagram showing the two non-linear flow primitives, both in .flow:
+       pick   `router ~0.55 accept @0.8 | ~0.6 reject @0.2`   → one weighted-random branch per packet
+       fanout `pub ~0.6 sub0 & ~0.55 sub1 & ~0.6 sub2`         → a packet to EVERY branch
+     Structure is placed by lane × rail. `data-seed` makes the pick reproducible; `data-source`
+     mirrors the source into the panel below. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>non-linear flows — pick &amp; fan-out</h1>
+  <p class="sub"><b>pick</b> (<code>|</code>) routes each packet down one weighted branch; <b>fan-out</b> (<code>&amp;</code>) sends a packet to every branch.</p>
+
+  <!-- ↓ this IS the diagram: boot() inserts a <canvas> right after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-seed="0x51F0" data-source="#src">
+diagram "Non-linear flows — pick × fan-out" 900x500
+
+# bare lanes auto-distribute into columns. the rails keep explicit y: this diagram has TWO
+# zone bands (pick on top, fan-out below), and the rail rows must align to those bands —
+# a case where even auto-distribution can't guess the grouping, so the y's are intentional.
+lane inp
+lane mid
+lane out
+
+rail am 150     # source / router  (weighted pick, top band)
+rail a0 110     # accept
+rail a1 200     # reject
+rail fm 370     # publisher / sub B (fan-out, bottom band)
+rail f0 310     # sub A
+rail f2 430     # sub C
+
+# bands (zones keep coordinates, aligned to the rail rows above)
+zone zp "weighted pick — a filter (80% accept · 20% reject)" x:32  y:70  w:836 h:180
+zone zf "fan-out — one publisher, every subscriber gets a copy" x:32 y:270 w:836 h:200
+
+# pick: source → router → { accept 0.8 | reject 0.2 }
+node src     lane:inp rail:am                    inspect:"<b>source</b> — emits requests at rate:2 into the pick router"
+node router core lane:mid rail:am sub:"80 / 20" inspect:"<b>router</b> — weighted pick: 80% → accept, 20% → reject"
+node accept  lane:out rail:a0 #emerald           inspect:"<b>accept</b> — ~80% of packets land here (weighted pick @0.8)"
+node reject  lane:out rail:a1 #rose              inspect:"<b>reject</b> — ~20% of packets land here (weighted pick @0.2)"
+
+edge router -> accept alpha:0.18
+edge router -> reject alpha:0.18
+edge src -> router alpha:0.22
+
+flow pick rate:2 : src ~0.6 router ~0.55 accept @0.8 | ~0.6 reject @0.2
+
+# fan-out: publisher → { sub A & sub B & sub C }
+node pub  core lane:mid rail:fm name:"publisher"  inspect:"<b>publisher</b> — fan-out source; one publish reaches ALL subscribers"
+node subA  lane:out rail:f0 name:"sub A"          inspect:"<b>sub A</b> — receives a copy of every published packet"
+node subB  lane:out rail:fm name:"sub B"          inspect:"<b>sub B</b> — receives a copy of every published packet"
+node subC  lane:out rail:f2 name:"sub C"          inspect:"<b>sub C</b> — receives a copy of every published packet"
+
+edge pub -> subA alpha:0.18
+edge pub -> subB alpha:0.18
+edge pub -> subC alpha:0.18
+
+flow fan rate:2 : pub ~0.6 subA & ~0.55 subB & ~0.6 subC
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — live readouts (telemetry bound to the store)</title>
+<!-- The behaviour store already COUNTS (`count received`, `count blended`, …) but nothing displayed
+     it. A `readout` node binds to a store key and renders it as a LIVE number that ticks up as the
+     flow runs — the missing telemetry layer. Here a feed is split by a weighted pick into blended vs
+     dropped, and three meters count each live. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — live readouts</h1>
+  <p class="sub">a <code>readout name:blended</code> node binds to a store counter and renders it as a
+    <b>live number</b>. The feed is split by a weighted pick (<code>@0.75</code> blend / <code>@0.25</code>
+    drop); the three meters tick up as <code>count received/blended/dropped</code> run. No host JS —
+    the numbers come straight from the behaviour store.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "live telemetry — readouts bound to store counters (no JS)" 720x300
+
+node feed core x:50  y:118 w:120 h:56 name:"feed" inspect:"<b>feed</b> — every tick is counted <code>received</code>, then split by a weighted pick"
+node ok   box  x:250 y:64  w:120 h:48 name:"blended" inspect:"<b>blended</b> — ~75% of ticks (@0.75); each runs <code>count blended</code>"
+node bad  box  x:250 y:186 w:120 h:48 name:"dropped" inspect:"<b>dropped</b> — ~25% of ticks (@0.25); each runs <code>count dropped</code>"
+
+node m0 readout name:received x:470 y:38  w:120 h:56 label:"received" inspect:"<b>received</b> — a live meter bound to the <code>received</code> counter"
+node m1 readout name:blended  x:470 y:120 w:120 h:56 label:"blended"  inspect:"<b>blended</b> — bound to the <code>blended</code> counter"
+node m2 readout name:dropped  x:470 y:202 w:120 h:56 label:"dropped"  inspect:"<b>dropped</b> — bound to the <code>dropped</code> counter"
+
+edge feed -> ok alpha:0.25
+edge feed -> bad alpha:0.25
+edge feed -> m0 alpha:0.18
+edge ok -> m1 alpha:0.18
+edge bad -> m2 alpha:0.18
+
+# every tick is received; a weighted pick sends ~75% to blended and ~25% to dropped — the meters count live
+seed 0x51F0
+flow ticks rate:5 : feed { count received } ~0.5 ok @0.75 { count blended } | ~0.5 bad @0.25 { count dropped }
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

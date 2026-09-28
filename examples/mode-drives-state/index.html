@@ -1,0 +1,50 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — mode drives state (not just rate)</title>
+<!-- A `mode` used to only multiply flow RATES. Now it can drive STATE: the storm toggle also takes a
+     column DOWN, floods a lane (surge), and speeds a matrix's decay — applied on enter and reverted on
+     exit. Click the "storm" button (auto-rendered from the mode) and watch the board rewire, then
+     un-rewire. ZERO authored JavaScript. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>Flowdot — mode drives state</h1>
+  <p class="sub">the <b>storm</b> toggle doesn't just speed the feed (<code>spawn x2</code>) — it also
+    <code>down m.col:1</code> (takes column B down), <code>surge q = 6</code> (floods the lane), and
+    <code>decay m x2</code> (fades the cache faster). Toggle it and the board rewires; toggle again and
+    every state effect reverts. No host JS — the mode line declares it all.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "storm mode drives state — down a feed, flood a lane, speed decay (no JS)" 760x330
+
+node feed core x:40  y:140 w:120 h:56 name:"feed" inspect:"<b>feed</b> — under storm its rate doubles (spawn x2)"
+node m matrix x:230 y:60 w:156 h:176 rows:3 cols:2 cw:76 ch:56 decay:0.5 title:"cache" colLabels:[A,B] inspect:"<b>cache</b> — storm takes column B DOWN and doubles the decay rate (cells fade twice as fast)"
+node q ring  x:560 y:140 slots:12 label:"lane" inspect:"<b>lane</b> — storm floods it with a surge of 6 (drained back when storm ends)"
+
+edge feed -> m.colTop:0 alpha:0.25
+edge m.rowRight:1 -> q alpha:0.25
+
+seed 0x51F0
+flow f rate:2 : feed ~0.4 m { write m.0.0 = 1; write m.1.0 = 2 } ~0.4 q { push q }
+
+# STORM rewires the board: faster sources, column B down, the lane flooded, the cache fading faster
+mode storm: spawn x2; down m.col:1; surge q = 6; decay m x2
+
+controls
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

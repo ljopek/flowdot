@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — content-based routing</title>
+<!-- ZERO authored JavaScript. A `|` pick branch can carry a `when <cond>` guard: the packet takes the
+     FIRST branch whose predicate is true (an unguarded branch is the else/default) — deterministic,
+     content-based routing, vs the weighted-random `@weight` pick. data-source mirrors the source. file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>content-based routing</h1>
+  <p class="sub">A <code>|</code> pick branch can carry a <code>when &lt;cond&gt;</code> guard: the packet takes the <b>first</b> branch whose predicate holds (an unguarded branch is the else/default) — <b>deterministic</b> routing by content, reusing the <code>when</code>/<code>drop if</code> expression grammar.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Content-based routing — a guarded branch" 820x340
+theme-toggle
+seed 3
+
+lane in
+lane mid
+lane out
+
+rail top
+rail bot
+
+node order   lane:in  rail:top                        inspect:"<b>order</b> — emits 2 orders/sec; each picks a random amount [1,2,3,8,9]"
+node router core lane:mid rail:top sub:"amount > 5 ?" inspect:"<b>router</b> — content-based routing: amount &gt; 5 → manual review, else auto-approve"
+node review  lane:out rail:top name:"manual review" #rose    inspect:"<b>manual review</b> — receives large orders (amount &gt; 5)"
+node auto    lane:out rail:bot name:"auto-approve"  #emerald inspect:"<b>auto-approve</b> — receives small orders (else/default branch)"
+
+edge order  -> router label:"orders" alpha:0.4
+edge router -> review alpha:0.18
+edge router -> auto   alpha:0.18
+
+# each order picks a random amount; route by predicate (NOT weighted): a big order → manual review,
+# else fall through to the unguarded auto-approve branch. Seeded, so the sequence is reproducible.
+flow orders rate:2 pick amt in [1, 2, 3, 8, 9] : order ~0.6 router ~0.6 review when amt > 5 | ~0.6 auto
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — pub/sub tiered conflation</title>
+<!-- ZERO authored JavaScript. A complex tutorial: a publisher keeps a per-tier LAST-VALUE slot, the
+     `&` fan-out broadcasts each publish to every subscriber, and three periodic drainers poll at
+     their own rates `when dirty(slot)`. Writing a slot a tier hasn't consumed SUPERSEDES the old
+     value — the intermediate update is conflated (latest-wins). Covers fan-out + periodics + actions
+     + `write`/`dirty`/`clean` + `when dirty`. data-source mirrors the source below. Opens file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>pub/sub tiered — conflation &amp; when-dirty pollers</h1>
+  <p class="sub">A publisher updates each tier's last-value slot fast; the <code>&amp;</code> fan-out broadcasts every publish to all subscribers. Each tier polls at its own rate and consumes <code>when dirty(slot)</code>. Writing a slot a slow tier hasn't read yet <b>supersedes</b> it — that update is <b>conflated</b>. Probe <code>document.querySelector('canvas').__flowdot.rt.store</code> (see <code>superseded</code>, <code>readFast/readMed/readSlow</code>).</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Pub/sub — tiered conflation" 900x380
+
+lane pubL
+lane subL
+
+rail top
+rail mid
+rail bot
+
+node pub  core lane:pubL rail:mid name:"publisher" sub:"last-value" inspect:"<b>publisher</b> — writes vFast/vMed/vSlow slots at rate:3; overwrites unconsumed = conflation"
+node fast  lane:subL rail:top name:"fast · every 0.4s" inspect:"<b>fast</b> — polls every 0.4s; keeps up with the publisher (little conflation)"
+node med   lane:subL rail:mid name:"medium · every 1s"  inspect:"<b>medium</b> — polls every 1s; misses some updates (some conflation)"
+node slow  lane:subL rail:bot name:"slow · every 2s"    inspect:"<b>slow</b> — polls every 2s; reads only the latest of many updates (heavy conflation)"
+
+edge pub -> fast alpha:0.15
+edge pub -> med  alpha:0.15
+edge pub -> slow alpha:0.15
+
+# the publisher updates each tier's last-value slot on every tick (fast). `count published` tallies
+# updates; each `write` marks that tier's slot dirty — overwriting a slot the tier has not yet read
+# SUPERSEDES the old value (conflation, tallied in rt.store.superseded). `&` fans the publish out to
+# all three subscribers at once.
+flow pub rate:3 : pub { count published; write vFast = published; write vMed = published; write vSlow = published } ~0.3 fast & ~0.6 med & ~0.9 slow
+
+# each tier polls at its own rate and consumes the latest value ONLY when its slot is dirty (unread).
+# the fast tier keeps up (little conflation); the slow tier sees only the latest of many updates.
+every 0.4 per _ in [0] when dirty(vFast) : clean vFast; count readFast
+every 1   per _ in [0] when dirty(vMed)  : clean vMed;  count readMed
+every 2   per _ in [0] when dirty(vSlow) : clean vSlow; count readSlow
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>

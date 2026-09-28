@@ -37,11 +37,21 @@
 
     <h2>Structure</h2>
     <a class="card" href="hello-world/index.html" target="fvp"><div class="name">hello-world</div><div class="desc">The smallest diagram — a node, an edge, a flow. One source → one worker.</div></a>
+    <a class="card" href="annotations/index.html" target="fvp"><div class="name">annotations</div><div class="desc">Add notes to nodes and a legend for diagram colours.</div></a>
+    <a class="card" href="edge-labels/index.html" target="fvp"><div class="name">edge-labels</div><div class="desc">Label and style connections to distinguish protocols and error paths.</div></a>
+    <a class="card" href="packaged-bundle/index.html" target="fvp"><div class="name">packaged-bundle</div><div class="desc">The consumer path: one <code>&lt;script src&gt;</code> loads the built <code>dist/flowdot.js</code> bundle, not the four <code>src/*.js</code> files. Vendor it; never point at <code>node_modules</code>.</div></a>
     <a class="card" href="zones/index.html" target="fvp"><div class="name">zones</div><div class="desc">Labelled grouping bands that infer their box from the lanes they span.</div></a>
     <a class="card" href="comprehensions/index.html" target="fvp"><div class="name">comprehensions</div><div class="desc"><code>set</code>, <code>each … in</code>, and <code>{expr}</code> — a 3×3 grid from six lines.</div></a>
+    <a class="card" href="owned-shards/index.html" target="fvp"><div class="name">owned-shards</div><div class="desc">A pinned <code>core</code> with <code>idle</code> (lit-but-idle: owns its data, at rest) and <code>owns:"P0"</code> (ownership caption) — a shard panel with no page-JS custom kind.</div></a>
+    <a class="card" href="free-divider/index.html" target="fvp"><div class="name">free-divider</div><div class="desc"><code>divider "label" x1,y1 -&gt; x2,y2</code> (alias <code>rule</code>) draws a standalone labelled line — a process boundary or a hot/cold split — that no <code>note</code> or <code>zone</code> could express. Dashed by default; add <code>solid</code> and a <code>#colour</code>.</div></a>
 
     <h2>Layout</h2>
     <a class="card" href="auto-layout/index.html" target="fvp"><div class="name">auto-layout</div><div class="desc">Place nodes by <code>lane</code> × <code>rail</code> — no coordinates. Zero-JS auto-boot.</div></a>
+    <a class="card" href="routing/index.html" target="fvp"><div class="name">routing</div><div class="desc">Route packets by ordered content guards, with a clear default branch.</div></a>
+    <a class="card" href="ortho-routing/index.html" target="fvp"><div class="name">ortho-routing</div><div class="desc">Opt-in <code>route:ortho</code> on an <code>edge</code>/<code>road</code> — right-angle (elbow) wires that bend through the midpoint instead of cutting diagonally across a packed layout. Straight (bezier) stays default.</div></a>
+
+    <h2>Authoring</h2>
+    <a class="card" href="playground/index.html" target="fvp"><div class="name">playground</div><div class="desc">Choose a built-in example, edit its <code>.flow</code> source, and see the diagram update.</div></a>
 
     <h2>Behaviour</h2>
     <a class="card" href="flow-pick/index.html" target="fvp"><div class="name">flow-pick</div><div class="desc">A weighted <code>|</code> pick — each packet takes one branch (80/20, seeded).</div></a>
@@ -49,21 +59,40 @@
     <a class="card" href="flow-actions/index.html" target="fvp"><div class="name">flow-actions</div><div class="desc">Hop <code>{ count …; push … }</code> actions mutate the runtime state store.</div></a>
     <a class="card" href="flow-schedule/index.html" target="fvp"><div class="name">flow-schedule</div><div class="desc"><code>spawn</code> a secondary packet and <code>after D:</code> schedule an event.</div></a>
     <a class="card" href="flow-events/index.html" target="fvp"><div class="name">flow-events</div><div class="desc"><code>drop if rand()&lt;0.2</code> and an <code>on &lt;event&gt;</code> handler.</div></a>
+    <a class="card" href="flow-branch/index.html" target="fvp"><div class="name">flow-branch</div><div class="desc">Combine weighted choice and fanout to show alternate and shared paths.</div></a>
+    <a class="card" href="join/index.html" target="fvp"><div class="name">join</div><div class="desc">Show converging paths at a shared destination.</div></a>
+    <a class="card" href="request-retry/index.html" target="fvp"><div class="name">request-retry</div><div class="desc">Illustrate request, response, loss and retry paths.</div></a>
+    <a class="card" href="message-queue-backpressure/index.html" target="fvp"><div class="name">message-queue-backpressure</div><div class="desc">Combine bounded queue occupancy, producer bursts and dropped packets.</div></a>
+    <a class="card" href="pubsub-tiered/index.html" target="fvp"><div class="name">pubsub-tiered</div><div class="desc">Combine publisher fanout, latest-value slots and independent reader rates.</div></a>
     <a class="card" href="periodics/index.html" target="fvp"><div class="name">periodics</div><div class="desc">Tiered <code>every … per … when</code> drainers, each on its own timer.</div></a>
+    <a class="card" href="matrix-decay/index.html" target="fvp"><div class="name">matrix-decay</div><div class="desc">A <code>matrix</code> with <code>decay:&lt;rate&gt;</code> — a cell lit by <code>write m.i.j</code> fades back to idle on its own, no host JS.</div></a>
+    <a class="card" href="ring-inline/index.html" target="fvp"><div class="name">ring-inline</div><div class="desc">A <code>ring</code> sits ON the flow path (<code>a ~&gt; ring ~&gt; b</code>) via its <code>out</code> port — a packet routes through it; <code>push</code>/<code>drain</code> raise and lower the fill.</div></a>
+    <a class="card" href="pipeline-stages/index.html" target="fvp"><div class="name">pipeline-stages</div><div class="desc"><code>~&gt; pipe.stages</code> routes a packet THROUGH a pipeline's stages — the dot walks decode→canonicalise→offer, one sub-leg per stage.</div></a>
+    <a class="card" href="packet-payload/index.html" target="fvp"><div class="name">packet-payload</div><div class="desc"><code>pick i in [...]</code> binds a per-fire value; <code>write grid.{i}.0</code> lights one cell per tick (not the whole column). Seeded + decaying.</div></a>
+    <a class="card" href="component-verbs/index.html" target="fvp"><div class="name">component-verbs</div><div class="desc">Hop actions call component methods: <code>highlight m.row:i</code>, <code>down</code>/<code>up m.col:j</code>, <code>surge ring</code>. A reader picks a row, writes it, and highlights it.</div></a>
+    <a class="card" href="tiered-delivery/index.html" target="fvp"><div class="name">tiered-delivery</div><div class="desc">A <code>#token</code> on a <code>spawn</code> colours the spawned packet, so <code>every … : spawn … #seriesN</code> delivers each tier's dot in its own colour.</div></a>
+    <a class="card" href="conflating-fanout/index.html" target="fvp"><div class="name">conflating-fanout</div><div class="desc">A <code>slot</code> node is one last-value buffer per subscriber — it flashes <code>superseded</code> when a new value overwrites an un-read one. N slots draw a legible conflating fan-out.</div></a>
+    <a class="card" href="live-readouts/index.html" target="fvp"><div class="name">live-readouts</div><div class="desc">A <code>readout name:blended</code> node binds to a store counter and renders it as a live number that ticks as the flow runs — the telemetry layer, zero JS.</div></a>
+    <a class="card" href="outcome-demux/index.html" target="fvp"><div class="name">outcome-demux</div><div class="desc">A packet's fate drives its colour: a <code>pick</code> value + a guarded <code>|</code> demux with a <code>#colour</code> per branch — emitted (emerald), stale (amber), suppressed (rose), each recolouring the packet and flashing its own node.</div></a>
+    <a class="card" href="heartbeat-window/index.html" target="fvp"><div class="name">heartbeat-window</div><div class="desc"><code>now()</code> is the runtime clock: a heartbeat rides its own track with a distinct token, and a window-boundary emission fires only after a silent window (<code>when now() - lastSeen &gt;= W</code>, re-arming) — time-as-event, no host timer.</div></a>
+    <a class="card" href="snapshot-burst/index.html" target="fvp"><div class="name">snapshot-burst</div><div class="desc"><code>snapshot grid</code> bulk-reads (visibly pulls) the whole grid at once (a late-join snapshot); <code>snapshot grid.row:i</code> pulls one whole row (a shard read). A burst ring sweeps the pulled cells and re-freshens them.</div></a>
 
     <h2>Controls</h2>
     <a class="card" href="controls/index.html" target="fvp"><div class="name">transport-controls</div><div class="desc">One <code>controls</code> line auto-renders a play/pause · reset · speed bar (zero-JS).</div></a>
     <a class="card" href="modes/index.html" target="fvp"><div class="name">modes</div><div class="desc">A <code>storm</code> mode toggle — sources fire faster while active.</div></a>
+    <a class="card" href="mode-drives-state/index.html" target="fvp"><div class="name">mode-drives-state</div><div class="desc">A mode drives state, not just rate: <code>storm</code> takes a matrix column down, floods a ring lane (surge), and speeds a matrix's decay — applied on enter, reverted on exit.</div></a>
+    <a class="card" href="narration/index.html" target="fvp"><div class="name">narration</div><div class="desc">A <code>narrate</code> timeline cycles a guided story on the runtime clock — each <code>narrate &lt;dwell&gt; &lt;node…&gt; : "caption"</code> step spotlights the node(s) with a pulsing ring and shows a caption banner. Zero JS.</div></a>
+    <a class="card" href="ghost-overlay/index.html" target="fvp"><div class="name">ghost-overlay</div><div class="desc">A <code>ghost "caption" x,y [-&gt; x2,y2]</code> line declares a counterfactual annotation — the naïve alternative's cost (GC debt, pointer-chase, blocking queue). Ghosts form a toggleable layer, hidden by default; the library auto-renders a <code>Ghost: off/on</code> button that shows/hides it. Zero JS.</div></a>
 
     <h2>Theming</h2>
     <a class="card" href="palette-colors/index.html" target="fvp"><div class="name">palette-colors</div><div class="desc">Colour tokens (<code>#sky</code>) + the theme ramp by index (<code>#series0</code>) that map per theme.</div></a>
     <a class="card" href="branded/index.html" target="fvp"><div class="name">branded</div><div class="desc">A registered theme pack (<code>diagram … light</code>) re-skins the whole diagram. Ships dark/light; register your own.</div></a>
+    <a class="card" href="recolor/index.html" target="fvp"><div class="name">recolor</div><div class="desc">Set colours for component kinds with one diagram-level declaration.</div></a>
+    <a class="card" href="swatches/index.html" target="fvp"><div class="name">swatches</div><div class="desc">Browse the built-in theme colours and semantic colour roles.</div></a>
+    <a class="card" href="theme-light/index.html" target="fvp"><div class="name">theme-light</div><div class="desc">See how theme colours adapt in the light colour scheme.</div></a>
 
-    <p class="docs">Docs: <a href="../docs/API.md" target="_blank">API.md</a> ·
-      <a href="../docs/AI-AUTHORING.md" target="_blank">AI-AUTHORING.md</a> ·
-      <a href="../docs/HOWTO.md" target="_blank">HOWTO.md</a> ·
-      <a href="../docs/FLOW-FORMAT.md" target="_blank">FLOW-FORMAT.md</a> ·
-      <a href="../docs/ERRORS.md" target="_blank">ERRORS.md</a></p>
+    <p class="docs">Docs: <a href="../docs/GUIDE.md" target="_blank">Guide</a> ·
+      <a href="../docs/API.md" target="_blank">API</a></p>
   </aside>
   <main>
     <div class="bar">Tip: middle-click (or ⌘/Ctrl-click) any example to open it in its own tab.</div>

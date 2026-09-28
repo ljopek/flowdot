@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- built by tools/build.js; library loaded from ../../dist/flowdot.min.js (cached across examples) -->
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flowdot — notes &amp; a legend</title>
+<!-- ZERO authored JavaScript. `note "…" -> <nodeId>` floats a callout chip above a node with a leader
+     line; `legend "label" #colour` (one row per line) renders an opt-in colour key. Both are the
+     documentation vocabulary a diagram needs. data-source mirrors the source below. Opens from file://. -->
+<link rel="stylesheet" href="../tutorial.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>notes &amp; a legend</h1>
+  <p class="sub"><code>note "…" -&gt; node</code> floats a callout above a node with a leader line; <code>legend "label" #colour</code> (one row per line) renders an opt-in colour key — the annotations a documentation diagram needs.</p>
+
+  <!-- ↓ this IS the diagram. boot() inserts a <canvas> after it and mounts this text. -->
+  <script type="text/flow" data-flowdot data-theme-toggle data-editable data-source="#src">
+diagram "Annotations — notes &amp; a legend" 820x360
+theme-toggle
+
+lane l
+lane m
+lane r
+
+rail mid
+
+node ingest  lane:l rail:mid #sky    inspect:"<b>ingest</b> — source; back-pressured by downstream capacity"
+node enrich core lane:m rail:mid #emerald inspect:"<b>enrich</b> — 5s tumbling window; buffers events before emitting"
+node sink    lane:r rail:mid #rose   inspect:"<b>sink</b> — final output; receives enriched events"
+
+edge ingest -> enrich label:"events"   alpha:0.4
+edge enrich -> sink   label:"enriched" alpha:0.4
+
+# callouts point at a node with a dashed leader line
+note "back-pressured"     -> ingest
+note "5s tumbling window" -> enrich
+
+# an opt-in colour key — one row per legend line
+legend "source"    #sky
+legend "processor" #emerald
+legend "output"    #rose
+
+flow f rate:2 #sky : ingest ~0.6 enrich ~0.6 sink
+  </script>
+
+  <p data-flow-inspector class="inspector">Hover a node to learn more.</p>
+  <div class="src-label">the .flow source — edit it and the diagram updates</div>
+  <textarea class="src" id="src" spellcheck="false"></textarea>
+</div>
+
+<!-- the library: renderer + builder + parser + the mount/auto-boot layer -->
+<script src="../../dist/flowdot.min.js"></script>
+</body>
+</html>
