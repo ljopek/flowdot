@@ -8,7 +8,7 @@
 <!-- `snapshot <matrix>` reads (and visibly PULLS) many cells at once: the whole grid for a late-join
      snapshot, or `snapshot <matrix>.row:i` for a shard's whole-row read. Each pull re-freshens the
      touched cells and sweeps a burst ring over them — a bulk read, not cell-by-cell. Pair with a
-     `matrix decay:` so the pulled cells settle again. ZERO authored JavaScript. Opens from file://. -->
+     `matrix decay:` so the pulled cells settle again. No authored JavaScript. Opens from file://. -->
 <link rel="stylesheet" href="../tutorial.css">
 </head>
 <body>

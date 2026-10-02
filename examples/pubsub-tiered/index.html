@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <title>Flowdot — pub/sub tiered conflation</title>
-<!-- ZERO authored JavaScript. A complex tutorial: a publisher keeps a per-tier LAST-VALUE slot, the
+<!-- No authored JavaScript. A complex tutorial: a publisher keeps a per-tier LAST-VALUE slot, the
      `&` fan-out broadcasts each publish to every subscriber, and three periodic drainers poll at
      their own rates `when dirty(slot)`. Writing a slot a tier hasn't consumed SUPERSEDES the old
      value — the intermediate update is conflated (latest-wins). Covers fan-out + periodics + actions

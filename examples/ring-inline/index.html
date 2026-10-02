@@ -8,7 +8,7 @@
 <!-- A ring buffer that sits ON the flow path, not beside it. With an `out` port, a ring is a
      first-class hop: `ingress ~> q ~> shard` routes a packet THROUGH the ring — it enters (a
      `{ push q }` action raises the fill), rides across, and leaves when the reader `{ drain q }`s it.
-     That is the actual SPSC lane, animated from pure .flow. ZERO authored JavaScript. Opens file://. -->
+     That is the actual SPSC lane, animated from pure .flow. No authored JavaScript. Opens file://. -->
 <link rel="stylesheet" href="../tutorial.css">
 </head>
 <body>

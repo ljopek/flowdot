@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <title>Flowdot — flow events (on &amp; drop if)</title>
-<!-- ZERO authored JavaScript. Two behaviour features: `drop if <cond>` terminates a packet mid-route
+<!-- No authored JavaScript. Two behaviour features: `drop if <cond>` terminates a packet mid-route
      (here ~20% of requests are rejected at the gate and never reach the sink), and `on <event>: …`
      defines a named handler fired by `after`/emit (here each accepted request schedules an `audit`).
      `seed` makes the random drops reproducible. `data-source="#src"` mirrors the source below. file://. -->

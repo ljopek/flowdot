@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <title>Flowdot — request / retry</title>
-<!-- ZERO authored JavaScript. A complex tutorial combining four behaviour features: a weighted `pick`
+<!-- No authored JavaScript. A complex tutorial combining four behaviour features: a weighted `pick`
      (`|`) routes each request to ok|fail; the ok branch `spawn`s an ack back to the client; the fail
      branch schedules `after 0.6: retry`; and `on retry` re-issues the request. `seed` makes the
      ok/fail sequence reproducible. Covers pick + after + spawn + on/events. data-source mirrors the

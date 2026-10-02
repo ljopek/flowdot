@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8">
 <title>Flowdot — fan-in / join (scatter → gather)</title>
-<!-- ZERO authored JavaScript. `join <node> : <inputA> <inputB> …` makes a node a BARRIER: it fires
+<!-- No authored JavaScript. `join <node> : <inputA> <inputB> …` makes a node a BARRIER: it fires
      (pulses + runs its arrival actions) only once EVERY named input has arrived — the dual of a `&`
      fan-out. Model a scatter-gather / stream-join / enrichment: gather waits for BOTH legs.
      data-source mirrors the source. file://. -->

@@ -8,7 +8,7 @@
 <!-- Time as a value. `now()` is the runtime clock, so a diagram can react to SILENCE with no host
      timer: data arrivals stamp `set lastSeen = now()`, a heartbeat rides its own track with a distinct
      token, and a window-boundary emission fires only after a silent window (`when now() - lastSeen >= W`),
-     re-arming each time. ZERO authored JavaScript. Opens from file://. -->
+     re-arming each time. No authored JavaScript. Opens from file://. -->
 <link rel="stylesheet" href="../tutorial.css">
 </head>
 <body>

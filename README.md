@@ -52,7 +52,8 @@ For a static page, copy `dist/flowdot.js` into the project. Do not link to a loc
 
 ## Learn Flowdot
 
+**▶ [Live example gallery](https://ljopek.github.io/flowdot/examples/)** — every feature running in your browser, each with its `.flow` source.
+
 - [Guide](docs/GUIDE.md): concepts, patterns, and host events.
 - [API](docs/API.md): exact syntax and JavaScript surface.
-- [Examples](examples/index.html): runnable diagrams with visible source.
-- [IR schema](docs/ir.schema.json): generated scene data schema.
+- [Examples](examples/index.html): the same diagrams as source in the repo.

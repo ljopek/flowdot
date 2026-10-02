@@ -1,17 +1,17 @@
 /*
- * Flowdot — ESM build by tools/build.js. Do not edit; edit src/ and rebuild.
+ * Flowdot -- ESM build by tools/build.js. Do not edit; edit src/ and rebuild.
  * Named exports match src/index.js; `import Flowdot from "flowdot"` also works.
  */
 const __ns = {};
 const globalThis = __ns;
 /*
- * Flowdot — bundled by tools/build.js. Do not edit; edit src/ and rebuild.
+ * Flowdot -- bundled by tools/build.js. Do not edit; edit src/ and rebuild.
  * Browser <script> use only (exposes window.Flowdot / SceneBuilder / Flow).
  * Node consumers: require('flowdot').
  */
-/* ─────────── src/flowdot.js ─────────── */
+/* ----------- src/flowdot.js ----------- */
 /*
- * Flowdot — a tiny framework for animated architecture / data-flow diagrams on canvas 2D.
+ * Flowdot -- a tiny framework for animated architecture / data-flow diagrams on canvas 2D.
  *
  * Goals: reusable components with clear interfaces, a first-class flow model (a packet follows
  * a route of legs with ONE identity, so a dot never changes colour mid-air or teleports), and
@@ -31,22 +31,22 @@ const globalThis = __ns;
 (function (global) {
   "use strict";
 
-  // ─────────────────────────────────────────────────────────── Theme
+  // ----------------------------------------------------------- Theme
   const Theme = {
     bg:'#060910', panel:'#0f1724', panel2:'#0d131e', line:'#26374a',
     text:'#e8f0fb', muted:'#93a6bd', white:'#ffffff',
     hot:'#4d9bff', bad:'#ff5a7a', idle:'#3a4a63', dim:'#41536e', accent:'#ffd24a',
-    // matrix cell fills (empty / down / stroke) — themed so a light scheme recolours them too
+    // matrix cell fills (empty / down / stroke) -- themed so a light scheme recolours them too
     cellBg:'#0e1c28', cellDown:'#2a1620', cellStroke:'#16222f',
-    // the asphalt track a road's coloured surface rides on — themed so a light scheme gets a light track
+    // the asphalt track a road's coloured surface rides on -- themed so a light scheme gets a light track
     roadBed:'#0b131d',
-    // domain palette (a diagram may override) — vivid so the roles stand out on the dark bg
+    // domain palette (a diagram may override) -- vivid so the roles stand out on the dark bg
     series:['#5ef2a0','#5cb4ff','#c98cff'],
-    // named colour tokens (referenced as `#emerald` etc.) — MAP per theme; dark values == the hex the
+    // named colour tokens (referenced as `#emerald` etc.) -- MAP per theme; dark values == the hex the
     // examples use today, so a token'd example renders as it did. Author-facing vocabulary; see resolveColor.
     colors:{ emerald:'#5ef2a0', sky:'#5cb4ff', violet:'#c98cff', amber:'#f2cc60', rose:'#ff9db1',
              mint:'#6ee7b7', lime:'#7ee787', azure:'#4f9dff', bronze:'#c98a4a' },
-    // default colour PER COMPONENT KIND (a role name resolved against the active theme) — so a diagram
+    // default colour PER COMPONENT KIND (a role name resolved against the active theme) -- so a diagram
     // that names no colours still renders fully themed, and a per-kind override / theme swap flows in
     // one place (see themeKindColor + the `colors <kind>:#tok` statement). Values == today's scattered
     // fallbacks, so nothing recolours. matrix draws its columns from the `series` ramp; flow uses road.
@@ -54,7 +54,7 @@ const globalThis = __ns;
                  zone:'line', road:'hot', edge:'line', flow:'hot' }
   };
 
-  // ─────────────────────────────────────────────────────────── named theme packs
+  // ----------------------------------------------------------- named theme packs
   // A registry so a diagram can pick a house style with `theme <name>` (or a page can register its own
   // brand via Flowdot.registerTheme). A named theme overlays the default Theme, so it may be partial.
   const Themes = { dark: Theme };
@@ -76,14 +76,14 @@ const globalThis = __ns;
     colors:{ emerald:'#0e9f6e', sky:'#2563eb', violet:'#7c3aed', amber:'#b45309', rose:'#c81e5b',
              mint:'#10b981', lime:'#3f9142', azure:'#1d4ed8', bronze:'#9a6a2e' } });
 
-  // ─────────────────────────────────────────────────────────── colour resolution (the `#` sigil)
+  // ----------------------------------------------------------- colour resolution (the `#` sigil)
   // Every colour is written `#<something>` (D-C). resolveColor maps it against the ACTIVE theme so a
   // token flips when the theme does, while hex + CSS names stay literal:
-  //   #rgb / #rrggbb        → literal hex (never maps — exact control)
-  //   #<theme token>        → theme.colors[name]  (emerald/sky/…  — MAPS per theme)
-  //   #<theme role>         → theme[name]         (text/muted/line/accent/hot/… — MAPS per theme)
-  //   #<css colour name>    → the bare name       (steelblue/lightblue/… — literal, canvas accepts it)
-  //   else                  → throw, listing the theme's tokens (a typo like #skyy is loud, not silent)
+  //   #rgb / #rrggbb        -> literal hex (never maps -- exact control)
+  //   #<theme token>        -> theme.colors[name]  (emerald/sky/...  -- MAPS per theme)
+  //   #<theme role>         -> theme[name]         (text/muted/line/accent/hot/... -- MAPS per theme)
+  //   #<css colour name>    -> the bare name       (steelblue/lightblue/... -- literal, canvas accepts it)
+  //   else                  -> throw, listing the theme's tokens (a typo like #skyy is loud, not silent)
   // A non-string or non-`#` value passes through unchanged (defensive; the parser enforces the sigil).
   const NAMED_COLORS = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black ' +
     'blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue ' +
@@ -102,15 +102,15 @@ const globalThis = __ns;
     'slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white ' +
     'whitesmoke yellow yellowgreen transparent currentcolor').split(' '));
   function resolveColor(value, theme) {
-    if (typeof value !== 'string' || value[0] !== '#') return value;   // not a `#…` colour → pass through
+    if (typeof value !== 'string' || value[0] !== '#') return value;   // not a `#...` colour -> pass through
     const body = value.slice(1), th = theme || Theme;
     if (/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(body)) return value;  // #hex literal
-    if (th.colors && th.colors[body] != null) return th.colors[body];  // theme token → maps
-    const sm = /^series(\d+)$/.exec(body);                             // #series0/1/2 → the theme's ramp (maps; for `each` loops)
+    if (th.colors && th.colors[body] != null) return th.colors[body];  // theme token -> maps
+    const sm = /^series(\d+)$/.exec(body);                             // #series0/1/2 -> the theme's ramp (maps; for `each` loops)
     if (sm && Array.isArray(th.series) && th.series[+sm[1]] != null) return th.series[+sm[1]];
-    if (typeof th[body] === 'string') return th[body];                 // theme role → maps
-    if (NAMED_COLORS.has(body.toLowerCase())) return body;             // CSS name → literal
-    throw new Error('flowdot: unknown colour "' + value + '" — use #hex, a theme token (' +
+    if (typeof th[body] === 'string') return th[body];                 // theme role -> maps
+    if (NAMED_COLORS.has(body.toLowerCase())) return body;             // CSS name -> literal
+    throw new Error('flowdot: unknown colour "' + value + '" -- use #hex, a theme token (' +
       Object.keys(th.colors || {}).join(', ') + '), a role, or a CSS colour name');
   }
   // The default colour for a component KIND under a theme: a per-kind override (env.kindColors, set by a
@@ -123,8 +123,8 @@ const globalThis = __ns;
     return th[role] || th.line;
   }
 
-  // ─────────────────────────────────────────────────────────── Rng (seedable, pure)
-  // mulberry32 — a tiny deterministic PRNG. A fixed seed makes an animation reproducible
+  // ----------------------------------------------------------- Rng (seedable, pure)
+  // mulberry32 -- a tiny deterministic PRNG. A fixed seed makes an animation reproducible
   // frame-for-frame, which is what turns a diagram into a diffable, re-renderable GIF. Returns a
   // callable `()=>[0,1)` with helpers .int(n), .range(lo,hi), .pick(arr).
   function Rng(seed) {
@@ -141,13 +141,13 @@ const globalThis = __ns;
     return next;
   }
 
-  // ─────────────────────────────────────────────────────────── Tween (pure)
+  // ----------------------------------------------------------- Tween (pure)
   const Tween = {
     clamp01:t => t < 0 ? 0 : t > 1 ? 1 : t,
     ease:t => (t = Tween.clamp01(t)) < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2,
     lerp:(a,b,t) => a + (b-a)*t,
     lerpPt:(p,q,t) => [p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t],
-    // Position at fraction t (0..1) along a polyline [[x,y],…] — used to animate a pulse along an
+    // Position at fraction t (0..1) along a polyline [[x,y],...] -- used to animate a pulse along an
     // orthogonal/elbow route (F11) the same way lerpPt animates it along a straight leg.
     polyPt(pts, t){ if(pts.length<2) return pts[0]||[0,0];
       const seg=[]; let total=0;
@@ -160,7 +160,7 @@ const globalThis = __ns;
     mix(a,b,t){ const A=hex(a), B=hex(b);
       return `rgb(${(A[0]+(B[0]-A[0])*t)|0},${(A[1]+(B[1]-A[1])*t)|0},${(A[2]+(B[2]-A[2])*t)|0})`; }
   };
-  // F11 (opt-in): an orthogonal "elbow" path between two points — HVH through the horizontal midpoint
+  // F11 (opt-in): an orthogonal "elbow" path between two points -- HVH through the horizontal midpoint
   // when the run is mostly horizontal, else VHV through the vertical midpoint. Right-angle wires stop
   // dense diagrams cutting diagonally across nodes. Returns the polyline points (straight stays default).
   function orthoPts(x1,y1,x2,y2){
@@ -176,7 +176,7 @@ const globalThis = __ns;
   function portPt(ref){ if(typeof ref==='function') return ref();
     if(ref.length===2 && typeof ref[0]==='number') return ref; return ref[0].port(ref[1]); }
 
-  // ─────────────────────────────────────────────────────────── Draw (stateless ctx helpers)
+  // ----------------------------------------------------------- Draw (stateless ctx helpers)
   const Draw = {
     roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y);
       g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
@@ -192,7 +192,7 @@ const globalThis = __ns;
     glow(g,x,y,r,color,a){ g.save(); g.globalCompositeOperation='lighter';
       g.shadowColor=color; g.shadowBlur=r*2.6; g.globalAlpha=a==null?1:a; g.fillStyle=color;
       g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); },
-    // a solid dot with a soft shadow — same footprint as glow() but NORMAL compositing, for light
+    // a solid dot with a soft shadow -- same footprint as glow() but NORMAL compositing, for light
     // backgrounds where additive 'lighter' washes the colour toward white (an invisible dot).
     dot(g,x,y,r,color,a){ g.save(); g.shadowColor=color; g.shadowBlur=r*1.8; g.globalAlpha=a==null?1:a;
       g.fillStyle=color; g.beginPath(); g.arc(x,y,r,0,7); g.fill(); g.restore(); },
@@ -206,7 +206,7 @@ const globalThis = __ns;
       g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) g.lineTo(pts[i][0],pts[i][1]); g.stroke(); g.restore(); }
   };
 
-  // ─────────────────────────────────────────────────────────── Component base
+  // ----------------------------------------------------------- Component base
   class Component {
     constructor(id, spec){ spec=spec||{};
       this.id=id; this.x=spec.x||0; this.y=spec.y||0; this.w=spec.w||0; this.h=spec.h||0;
@@ -214,7 +214,7 @@ const globalThis = __ns;
       this.hoverable=spec.hoverable!==false;
       this.hovered=false;
       // Per-node "activity energy" (F9): pulse/arrival bumps it to 1, update() decays it each frame.
-      // OPT-IN via `decay:` — with no decay rate a kind renders exactly as before (energy is ignored).
+      // OPT-IN via `decay:` -- with no decay rate a kind renders exactly as before (energy is ignored).
       this.energy=0; this.decayRate=+spec.decay||0;
     }
     // Arrival/pulse bump: mark the node active. Every kind gets this now (was Pipeline/Connector only);
@@ -222,7 +222,7 @@ const globalThis = __ns;
     pulse(now){ this.pulseAt=now; this.energy=1; }
     // Per-frame hook (Diagram's loop calls it on every component while not paused): fade energy to idle.
     update(dt){ if(this.decayRate>0) this.energy=Math.max(0, this.energy - dt*this.decayRate); }
-    // Opacity that follows energy when a decay rate is set (idle→dim, active→full); 1 (no change) otherwise.
+    // Opacity that follows energy when a decay rate is set (idle->dim, active->full); 1 (no change) otherwise.
     energyAlpha(){ return this.decayRate>0 ? 0.45 + 0.55*this.energy : 1; }
     bounds(){ return {x:this.x, y:this.y, w:this.w, h:this.h}; }
     contains(mx,my){ return mx>=this.x && mx<=this.x+this.w && my>=this.y && my<=this.y+this.h; }
@@ -241,13 +241,13 @@ const globalThis = __ns;
     draw(){ /* override */ }
   }
 
-  // ─────────────────────────────────────────────────────────── Box
+  // ----------------------------------------------------------- Box
   class Box extends Component {
     constructor(id, spec){ super(id, spec);
-      this.name=spec.name||id; this.sub=spec.sub||null; this.accent=spec.accent||null; }  // null → theme default at draw
+      this.name=spec.name||id; this.sub=spec.sub||null; this.accent=spec.accent||null; }  // null -> theme default at draw
     draw(g, env){
       const kc=themeKindColor(env.theme,'box',env.kindColors);
-      const active=this.decayRate>0;                              // F9: opt-in energy glow (idle→dim, active→lit)
+      const active=this.decayRate>0;                              // F9: opt-in energy glow (idle->dim, active->lit)
       if(active){ g.save(); g.globalAlpha=this.energyAlpha(); }
       Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel, stroke:this.accent||kc,
         glow:this.hovered?env.theme.hot:(active && this.energy>0.5 ? (this.accent||kc) : null)});
@@ -257,10 +257,10 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Core (pinned, double border)
+  // ----------------------------------------------------------- Core (pinned, double border)
   class Core extends Box {
     constructor(id, spec){ super(id, spec); this.lit=spec.lit!==false;
-      // F13: a "lit-but-idle" pinned shard — `idle` renders the lit border at a calm resting intensity
+      // F13: a "lit-but-idle" pinned shard -- `idle` renders the lit border at a calm resting intensity
       // (owns-its-data, at rest) between bright-lit and off; `owns` draws a small caption ("owns P3").
       this.idle=!!spec.idle; this.owns=(spec.owns!=null)?spec.owns:null; }
     draw(g, env){ const accent=this.accent||themeKindColor(env.theme,'core',env.kindColors);
@@ -268,7 +268,7 @@ const globalThis = __ns;
       if(active){ g.save(); g.globalAlpha=this.energyAlpha(); }
       Draw.box(g,this.x,this.y,this.w,this.h,{fill:env.theme.panel2,stroke:env.theme.line,r:9,
         glow:this.hovered?env.theme.hot:(active && this.energy>0.5 && !this.idle ? accent : null)});
-      // inner border: bright-lit (ready) · idle-but-lit (owns, at rest) · off (dim grey)
+      // inner border: bright-lit (ready) - idle-but-lit (owns, at rest) - off (dim grey)
       g.save(); g.strokeStyle=this.lit?accent:env.theme.idle; g.globalAlpha=this.lit?(this.idle?0.6:0.9):0.5; g.lineWidth=1.4;
       Draw.roundRect(g,this.x+3,this.y+3,this.w-6,this.h-6,7); g.stroke(); g.restore();
       const ny=this.owns!=null?this.y+this.h/2-4:this.y+this.h/2+4;
@@ -278,17 +278,17 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Slot (single last-value cell, F4)
+  // ----------------------------------------------------------- Slot (single last-value cell, F4)
   // One conflation buffer per subscriber: holds the LAST value written, shows whether it is still
-  // PENDING (dirty, un-read) and FLASHES "superseded" when a new value overwrites an un-read one —
+  // PENDING (dirty, un-read) and FLASHES "superseded" when a new value overwrites an un-read one --
   // the conflation moment (latest-wins). N slots side by side = a legible per-subscriber fanout,
   // where a shared "fanout box" hid the overwrite-before-read. Driven from .flow via write/dirty/clean
   // on the slot's own id (`write s1 = v` produces, `clean s1` = the subscriber read it).
   class Slot extends Component {
     constructor(id, spec){ super(id, spec);
-      this.name=spec.name||id; this.accent=spec.accent||null;   // null → theme default at draw
+      this.name=spec.name||id; this.accent=spec.accent||null;   // null -> theme default at draw
       this.value=(spec.value!=null)?spec.value:null; this.dirty=false; this.supersededAt=-1; this.writes=0; }
-    // A new value arrives. Overwriting an un-read (dirty) value is a SUPERSEDE — flash it.
+    // A new value arrives. Overwriting an un-read (dirty) value is a SUPERSEDE -- flash it.
     set(value, now){ if(this.dirty) this.supersededAt=(now==null?0:now); this.value=value; this.dirty=true; this.writes++; return this; }
     mark(now){ if(this.dirty) this.supersededAt=(now==null?0:now); this.dirty=true; }   // dirty, no new value
     read(){ this.dirty=false; return this.value; }                                       // subscriber drained it (clean)
@@ -297,7 +297,7 @@ const globalThis = __ns;
       Draw.box(g,this.x,this.y,this.w,this.h,{fill:th.panel,stroke:this.dirty?accent:th.line,
         glow:this.hovered?th.hot:(flash>0?th.bad:(this.dirty?accent:null)),r:7});
       Draw.text(g,this.name,this.x+9,this.y+14,{c:th.muted,size:10,w:'600'});
-      Draw.text(g,this.value==null?'—':String(this.value),this.x+this.w/2,this.y+this.h/2+9,
+      Draw.text(g,this.value==null?'--':String(this.value),this.x+this.w/2,this.y+this.h/2+9,
         {c:this.dirty?(this.accent||th.text):th.muted,size:16,align:'center',w:'600'});
       if(this.dirty && flash===0) Draw.glow(g,this.x+this.w-11,this.y+11,3,accent,0.9);   // pending (un-read) dot
       if(flash>0){ g.save(); g.strokeStyle=th.bad; g.globalAlpha=0.9*flash; g.lineWidth=2.2;
@@ -306,7 +306,7 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Readout (live store meter, F8)
+  // ----------------------------------------------------------- Readout (live store meter, F8)
   // A telemetry tile: renders a LIVE number bound to a store key (`count`ed counter, `set` value,
   // ring depth, `superseded`, or a dotted `comp.prop` like a ring's `overruns`). The store isn't in
   // the draw env, so SceneBuilder wires `this.get` at buildFlows time; draw/update poll it and flash
@@ -330,11 +330,11 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── RingBuffer (SPSC lane)
+  // ----------------------------------------------------------- RingBuffer (SPSC lane)
   // State + logic is testable (push/drain/surge/lapping); draw renders slots + write cursor.
   class RingBuffer extends Component {
     constructor(id, spec){ super(id, spec);
-      this.slots=spec.slots||12; this.r=spec.r||16; this.color=spec.color||null;  // null → theme.hot at draw
+      this.slots=spec.slots||12; this.r=spec.r||16; this.color=spec.color||null;  // null -> theme.hot at draw
       this.label=spec.label||null;      // e.g. the provider this lane carries
       // Optional, self-reserving box: a ring drawn with no explicit w/h sizes its box to hold the
       // circle AND its side label (see _labelW / bounds), so auto-placed rings never intersect.
@@ -352,7 +352,7 @@ const globalThis = __ns;
       if(this.fill>this.slots){ const skip=Math.floor(this.fill-this.slots); this.overruns+=skip; this.fill=this.slots; }
       if(this.fill<0) this.fill=0; }
     get lapping(){ return this.fill >= this.slots*0.95; }
-    // The full drawn extent (circle radius + side label), unioned with the box — this is what the
+    // The full drawn extent (circle radius + side label), unioned with the box -- this is what the
     // layout must reserve so adjacent/auto-placed rings and their labels never intersect.
     bounds(){ const cx=this._cx(), cy=this.y+this.h/2, lw=this.label ? 8 + this._labelW() : 0;
       const left=Math.min(this.x, cx-this.r), right=Math.max(this.x+this.w, cx+this.r+lw);
@@ -363,7 +363,7 @@ const globalThis = __ns;
       if(name==='center') return [this._cx(), cy];
       // `out` = the circle's right edge, so a ring sits INLINE in a flow (`a ~> ring ~> b`): a packet
       // enters left, crosses the ring, and leaves the other side (F2). The base `out` was the box-right
-      // edge — for a labelled ring that lands past the side label, so the exit looked disconnected.
+      // edge -- for a labelled ring that lands past the side label, so the exit looked disconnected.
       if(name==='out') return [this._cx()+this.r, cy];
       return super.port(name); }
     draw(g, env){
@@ -382,18 +382,18 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Matrix (grid of cells)
+  // ----------------------------------------------------------- Matrix (grid of cells)
   class Matrix extends Component {
     constructor(id, spec){ super(id, spec);
       this.rows=spec.rows; this.cols=spec.cols; this.cw=spec.cw||76; this.ch=spec.ch||56; this.gap=spec.gap||4;
-      this.colColors=spec.colColors||null; this.rowLabels=spec.rowLabels||[]; this.colLabels=spec.colLabels||[];  // null → theme.series at draw
+      this.colColors=spec.colColors||null; this.rowLabels=spec.rowLabels||[]; this.colLabels=spec.colLabels||[];  // null -> theme.series at draw
       this.title=spec.title||'Matrix'; this.subtitle=spec.subtitle||''; this.cellNote=spec.cellNote||null;
       this.w=this.cols*(this.cw+this.gap)-this.gap; this.h=this.rows*(this.ch+this.gap)-this.gap;
       this.decayRate=+spec.decay||0;                             // declarative per-frame fade (F1); 0 = latch (prior behaviour)
       this.cells=[]; for(let i=0;i<this.rows;i++){ const r=[];
         for(let j=0;j<this.cols;j++) r.push({value:null, fresh:0, down:false}); this.cells.push(r); }
       this.hi={i:-1, at:-1};
-      this.snap=null;                                            // F18: {row:-1|i, at} — a bulk-read burst overlay
+      this.snap=null;                                            // F18: {row:-1|i, at} -- a bulk-read burst overlay
     }
     // Per-frame hook (called by Diagram's loop while not paused): a matrix with `decay:` self-fades
     // written cells back to idle, so `write id.i.j` from pure .flow doesn't latch ON forever.
@@ -406,7 +406,7 @@ const globalThis = __ns;
     decay(dt,rate){ for(let i=0;i<this.rows;i++)for(let j=0;j<this.cols;j++){
       const c=this.cells[i][j]; c.fresh = c.down?0:Math.max(0,c.fresh-dt*rate); } }
     highlightRow(i,now){ this.hi={i, at:now}; }
-    // F18: read (visibly pull) many cells at once — a whole row (i≥0) or the WHOLE grid (i null/<0),
+    // F18: read (visibly pull) many cells at once -- a whole row (i>=0) or the WHOLE grid (i null/<0),
     // for a late-join snapshot or a shard's whole-row read. Re-freshens each valued cell (the visible
     // pull) and records a burst overlay; returns how many cells were pulled.
     snapshot(row, now){ this.snap={ row:(row==null?-1:row), at:(now==null?0:now) };
@@ -438,12 +438,12 @@ const globalThis = __ns;
         if(this.cellNote){ const note=this.cellNote(i,j); if(note) Draw.text(g,note,x+6,y+13,{c:env.theme.muted,size:8.5}); }
         if(c.down) Draw.text(g,'DOWN',x+this.cw/2,y+34,{c:env.theme.bad,size:9,align:'center',w:'600'});
         else if(f>0.05 && c.value!=null){ Draw.text(g,c.value,x+this.cw/2,y+33,{c:env.theme.text,size:10,align:'center'});
-          Draw.text(g,((1-f)*30|0)+'µs',x+this.cw/2,y+45,{c:env.theme.muted,size:8.5,align:'center'}); }
+          Draw.text(g,((1-f)*30|0)+'us',x+this.cw/2,y+45,{c:env.theme.muted,size:8.5,align:'center'}); }
       }
       if(this.hi.at>=0 && env.now-this.hi.at<0.5){ const a=1-(env.now-this.hi.at)/0.5, ry=this.rowY(this.hi.i);
         g.save(); g.strokeStyle=env.theme.accent; g.globalAlpha=0.9*a; g.lineWidth=2.2;
         Draw.roundRect(g,this.colX(0)-3,ry-3,this.w+6,this.ch+6,8); g.stroke(); g.restore(); }
-      // F18: the snapshot burst — a white ring sweeping the whole grid (row<0) or one row, fading over 0.6s.
+      // F18: the snapshot burst -- a white ring sweeping the whole grid (row<0) or one row, fading over 0.6s.
       if(this.snap && env.now-this.snap.at<0.6){ const a=1-(env.now-this.snap.at)/0.6;
         g.save(); g.strokeStyle=env.theme.white; g.globalAlpha=0.85*a; g.lineWidth=2.4;
         if(this.snap.row<0) Draw.roundRect(g,this.x-4,this.y-4,this.w+8,this.h+8,10);
@@ -452,18 +452,18 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Pipeline (chain of stage nodes)
+  // ----------------------------------------------------------- Pipeline (chain of stage nodes)
   // A chain of stage nodes that light up in sequence on pulse(). Horizontal by default; set
   // `vertical` to stack the steps (and label to the right). `boxed`/`pinned`/`name` wrap it in a
-  // container — so the same component renders either a horizontal chain or a vertical step-stack.
+  // container -- so the same component renders either a horizontal chain or a vertical step-stack.
   class Pipeline extends Component {
     constructor(id, spec){ super(id, spec);
       this.stages=spec.stages||['a','b'];
       // vertical stacks default to a SMALL stage radius so 3 stages fit a normal box without the
-      // circles overlapping (step 24 − 2·8 = 8px gap); horizontal chains keep the larger 15.
+      // circles overlapping (step 24 - 2-8 = 8px gap); horizontal chains keep the larger 15.
       this.nodeR=spec.nodeR!=null?spec.nodeR:(spec.vertical?8:15); this.idle=!!spec.idle;
       this.vertical=!!spec.vertical; this.boxed=!!spec.boxed; this.pinned=!!spec.pinned;
-      this.name=spec.name||null; this.accent=spec.accent||null;  // null → theme.accent at draw
+      this.name=spec.name||null; this.accent=spec.accent||null;  // null -> theme.accent at draw
       this.pad=spec.pad!=null?spec.pad:(this.vertical?36:118);
       this.step=spec.step!=null?spec.step:(this.vertical?24:70);
       this.pulseAt=-1; }
@@ -499,11 +499,11 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Zone (labelled architecture layer)
+  // ----------------------------------------------------------- Zone (labelled architecture layer)
   class Zone extends Component {
     constructor(id, spec){ super(id, spec);
       this.label=spec.label||''; this.tint=spec.tint||'rgba(120,150,190,0.035)';
-      this.accent=spec.accent||null; this.hoverable=false; }  // null → theme.line at draw
+      this.accent=spec.accent||null; this.hoverable=false; }  // null -> theme.line at draw
     draw(g, env){ const th=env.theme;
       g.save(); g.fillStyle=this.tint; Draw.roundRect(g,this.x,this.y,this.w,this.h,12); g.fill();
       g.globalAlpha=0.55; g.strokeStyle=this.accent||themeKindColor(th,'zone',env.kindColors); g.lineWidth=1.2; g.setLineDash([5,4]);
@@ -511,13 +511,13 @@ const globalThis = __ns;
       if(this.label) Draw.text(g,this.label,this.x+14,this.y+19,{c:th.muted,size:12,w:'600'}); }
   }
 
-  // ─────────────────────────────────────────────────────────── Channel (a "road" packets travel on)
-  // A fat, styled edge with animated lane markings — use it for transport hops so packets read as
+  // ----------------------------------------------------------- Channel (a "road" packets travel on)
+  // A fat, styled edge with animated lane markings -- use it for transport hops so packets read as
   // cars on a road. Thin Connectors stay for in-process edges.
   class Channel extends Component {
     constructor(id, spec){ super(id, spec); this.from=spec.from; this.to=spec.to;
-      this.roadW=spec.roadW||spec.width||16; this.color=spec.color||null; this.label=spec.label||null;  // `.flow` authors write width:; roadW is the IR name. null color → theme default at draw
-      this.route=spec.route||null;                                     // F11 opt-in: 'ortho'/'elbow' → right-angle road; else the default bezier
+      this.roadW=spec.roadW||spec.width||16; this.color=spec.color||null; this.label=spec.label||null;  // `.flow` authors write width:; roadW is the IR name. null color -> theme default at draw
+      this.route=spec.route||null;                                     // F11 opt-in: 'ortho'/'elbow' -> right-angle road; else the default bezier
       this.hoverable=spec.hoverable!==false; }
     _ortho(){ return this.route==='ortho'||this.route==='elbow'; }
     _pt(ref){ return portPt(ref); }
@@ -529,7 +529,7 @@ const globalThis = __ns;
       return mx>=Math.min(a[0],b[0])-r && mx<=Math.max(a[0],b[0])+r && my>=Math.min(a[1],b[1])-r && my<=Math.max(a[1],b[1])+r; }
     draw(g, env){ const th=env.theme, color=this.color||themeKindColor(th,'road',env.kindColors);
       g.save(); g.lineCap='round';
-      this._path(g); g.strokeStyle=th.roadBed; g.lineWidth=this.roadW; g.stroke();                         // road bed (asphalt track, themed — light in a light scheme)
+      this._path(g); g.strokeStyle=th.roadBed; g.lineWidth=this.roadW; g.stroke();                         // road bed (asphalt track, themed -- light in a light scheme)
       this._path(g); g.strokeStyle=color; g.globalAlpha=this.hovered?0.30:0.16; g.lineWidth=Math.max(1,this.roadW-3); g.stroke(); // surface (guard: a thin road never yields a 0/negative stroke)
       this._path(g); g.strokeStyle=color; g.globalAlpha=0.8; g.lineWidth=1.4;                        // moving lane markings
       g.setLineDash([5,9]); g.lineDashOffset=-(env.now*36)%14; g.stroke(); g.setLineDash([]);
@@ -538,14 +538,14 @@ const globalThis = __ns;
         Draw.text(g,this.label,(a[0]+b[0])/2,Math.min(a[1],b[1])-this.roadW/2-4,{c:th.muted,size:8.5,align:'center'}); } }
   }
 
-  // ─────────────────────────────────────────────────────────── Connector (pulseable edge)
+  // ----------------------------------------------------------- Connector (pulseable edge)
   class Connector {
     constructor(from, to, opts){ this.from=from; this.to=to; this.opts=opts||{}; this.pulseAt=-1; }
     pulse(now){ this.pulseAt=now; }
     _pt(ref){ return portPt(ref); }   // [component, portName] | [x,y] | ()=>[x,y]
     _ortho(){ const r=this.opts.route; return r==='ortho'||r==='elbow'; }   // F11 opt-in; straight (bezier) stays default
     draw(g, env){ const a=this._pt(this.from), b=this._pt(this.to);
-      const dash=this.opts.dash||(this.opts.dashed?[5,4]:null);   // `dashed` flag → a default dash (async/lossy edge)
+      const dash=this.opts.dash||(this.opts.dashed?[5,4]:null);   // `dashed` flag -> a default dash (async/lossy edge)
       const col=this.opts.c||themeKindColor(env.theme,'edge',env.kindColors), alpha=this.opts.alpha==null?0.18:this.opts.alpha;
       const ortho=this._ortho(), pts=ortho?orthoPts(a[0],a[1],b[0],b[1]):null;
       if(ortho) Draw.polyline(g,pts,{c:col,alpha,dash});
@@ -587,15 +587,15 @@ const globalThis = __ns;
         Draw.text(g,this.label,mx,my+4,{c:env.theme.text,size:10,align:'center'}); g.restore(); } }
   }
 
-  // A ghost / counterfactual annotation (F16): a DIM, italic, dashed callout ("what a naïve impl would
-  // cost" — GC debt, pointer-chase, a blocking queue). It's part of a toggleable layer (Diagram.ghostOn),
+  // A ghost / counterfactual annotation (F16): a DIM, italic, dashed callout ("what a naive impl would
+  // cost" -- GC debt, pointer-chase, a blocking queue). It's part of a toggleable layer (Diagram.ghostOn),
   // HIDDEN by default; the scene registers one overlay that draws the ghosts only while the layer is on.
   class Ghost {
     constructor(spec){ spec=spec||{};
       this.text=spec.text||''; this.x=+spec.x; this.y=+spec.y;
       this.x2=(spec.x2!=null)?+spec.x2:null; this.y2=(spec.y2!=null)?+spec.y2:null; this.color=spec.color||null; }
     draw(g, env){ const c=this.color||env.theme.muted;
-      g.save(); g.globalAlpha=0.42;                                 // dim — a faded counterfactual under the real diagram
+      g.save(); g.globalAlpha=0.42;                                 // dim -- a faded counterfactual under the real diagram
       if(this.x2!=null){ g.strokeStyle=c; g.lineWidth=1.4; g.setLineDash([2,4]);  // an optional ghost wire
         g.beginPath(); g.moveTo(this.x,this.y); g.lineTo(this.x2,this.y2); g.stroke(); g.setLineDash([]); }
       if(this.text){ g.font='italic 10px ui-monospace,monospace'; const tw=g.measureText(this.text).width;
@@ -604,15 +604,15 @@ const globalThis = __ns;
       g.restore(); }
   }
 
-  // Relative luminance (WCAG) of a #rrggbb — used to detect a light theme background so the flow dot
+  // Relative luminance (WCAG) of a #rrggbb -- used to detect a light theme background so the flow dot
   // renders solid instead of additively (which would wash it out to white on a light bg).
   function relLum(hex){ const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return 0;
     const n=parseInt(m[1],16), lin=c=>{c/=255; return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);};
     return 0.2126*lin(n>>16&255)+0.7152*lin(n>>8&255)+0.0722*lin(n&255); }
 
-  // ─────────────────────────────────────────────────────────── FlowSystem (packets on routes)
+  // ----------------------------------------------------------- FlowSystem (packets on routes)
   // A leg: { from, to, dur, style?, onArrive? }.  from/to are port refs (see Connector._pt).
-  // A packet keeps ONE identity across its whole route — this is what stops dots teleporting.
+  // A packet keeps ONE identity across its whole route -- this is what stops dots teleporting.
   class FlowSystem {
     constructor(){ this.packets=[]; }
     spawn(route, opts){ opts=opts||{};
@@ -630,26 +630,26 @@ const globalThis = __ns;
       const q=this.pos(p); (light?Draw.dot:Draw.glow)(g,q[0],q[1],st.r||3.4,st.color); } }
   }
 
-  // ─────────────────────────────────────────────────────────── FlowRuntime (temporal control)
+  // ----------------------------------------------------------- FlowRuntime (temporal control)
   // The discrete-event core of an animated diagram, factored out of bespoke per-frame code so the
   // The behaviour DSL can drive this runtime. One update(dt,now) runs five
   // phases in a FIXED order, which is what makes a refactor onto it behaviour-preserving:
-  //   1. sources    — periodic emitters (a rate accumulator + optional guard)          `flow … rate:`
-  //   2. onFrame    — host per-frame work (decay, surge, …)                            `js{ … }` escape
-  //   3. timers     — scheduled callbacks whose time has come, budget-limited & in time order  `after D:`
-  //   4. periodics  — per-entity behaviour at an interval, with an optional guard       `every … per …`
-  //   5. afterFrame — host end-of-frame work (metrics roll-up)                          `js{ … }` escape
-  // Pure logic (no canvas) → unit-testable.
+  //   1. sources    -- periodic emitters (a rate accumulator + optional guard)          `flow ... rate:`
+  //   2. onFrame    -- host per-frame work (decay, surge, ...)                            `js{ ... }` escape
+  //   3. timers     -- scheduled callbacks whose time has come, budget-limited & in time order  `after D:`
+  //   4. periodics  -- per-entity behaviour at an interval, with an optional guard       `every ... per ...`
+  //   5. afterFrame -- host end-of-frame work (metrics roll-up)                          `js{ ... }` escape
+  // Pure logic (no canvas) -> unit-testable.
   class FlowRuntime {
     constructor(){ this.now=0; this._sources=[]; this._timers=[]; this._periodics=[];
       this._onFrame=null; this._afterFrame=null; this._timerBudget=null; this._modes={}; this._events={}; this._modeHooks=[]; }
-    // Named events: `after D: ev` schedules emit(ev) at t+D; `on ev(p): …` handlers register here.
+    // Named events: `after D: ev` schedules emit(ev) at t+D; `on ev(p): ...` handlers register here.
     onEvent(name, fn){ (this._events[name] || (this._events[name] = [])).push(fn); return this; }
     emit(name, arg){ const hs=this._events[name]; if(hs) for(const h of hs) h(arg); return this; }
     // Named modes (e.g. `storm`) carry effects; while active, an `op:'rate'` effect multiplies the
     // spawn rate of every source (shrinking its interval). Toggle with setMode; query with modeActive
     // (the `mode(name)` expression built-in reads this). `op:'drainMul'` is parsed + stored for the
-    // periodics phase (wired with `every … per …`); it does not affect sources.
+    // periodics phase (wired with `every ... per ...`); it does not affect sources.
     defineMode(name, effects){ this._modes[name]={active:false, effects:effects||[]}; return this; }
     // F14: a mode can drive STATE, not just rate. SceneBuilder registers a hook here (it owns the
     // components); setMode calls it ONLY on an actual on/off transition, so state effects apply once
@@ -670,7 +670,7 @@ const globalThis = __ns;
     // Restart the flow from t=0: clock, source/periodic accumulators, pending one-shots and the state
     // store all return to their initial values (modes/handlers/sources themselves are kept, so the
     // diagram replays deterministically). Wired to the transport "Reset" control. ponytail: drops
-    // pending `after` timers rather than rebasing them — they re-arm as the flow re-fires.
+    // pending `after` timers rather than rebasing them -- they re-arm as the flow re-fires.
     reset(){ this.now=0;
       for(const s of this._sources) s.acc=0;
       for(const p of this._periodics) p.last=p.items.map(()=>0);
@@ -683,10 +683,10 @@ const globalThis = __ns;
     update(dt, now){ this.now=now;
       const rf=this._rateFactor();                                    // active modes speed up sources
       for(const s of this._sources){ s.acc+=dt; const gap=s.interval()/rf;
-        if(gap<=0){ if(!s.guard || s.guard()) s.fire(); s.acc=0; continue; }  // 0/neg interval → once per update, never spin
+        if(gap<=0){ if(!s.guard || s.guard()) s.fire(); s.acc=0; continue; }  // 0/neg interval -> once per update, never spin
         while(s.acc>gap){ s.acc-=gap; if(!s.guard || s.guard()) s.fire(); } }
       if(this._onFrame) this._onFrame(dt);
-      if(this._timers.length){ this._timers.sort((a,b)=>a.at-b.at);   // stable → equal-time = FIFO
+      if(this._timers.length){ this._timers.sort((a,b)=>a.at-b.at);   // stable -> equal-time = FIFO
         const budget=this._timerBudget?this._timerBudget():Infinity; let n=0;
         while(this._timers.length && this._timers[0].at<=now && n<budget){ this._timers.shift().fn(); n++; } }
       for(const p of this._periodics) p.items.forEach((it,ix)=>{ const iv=p.interval(it,ix);
@@ -695,7 +695,7 @@ const globalThis = __ns;
     }
   }
 
-  // ─────────────────────────────────────────────────────────── Diagram (shell)
+  // ----------------------------------------------------------- Diagram (shell)
   class Diagram {
     constructor(canvas, spec){ spec=spec||{};
       this.cv=canvas; this.g=canvas.getContext('2d');
@@ -791,14 +791,14 @@ const globalThis = __ns;
       g.restore(); }
   }
 
-  // ─────────────────────────────────────────────────────────── StateStore (declarative behaviour)
-  // A tiny named state store for the .flow behaviour verbs — pure data, no canvas and no components,
+  // ----------------------------------------------------------- StateStore (declarative behaviour)
+  // A tiny named state store for the .flow behaviour verbs -- pure data, no canvas and no components,
   // so a Tier-1 diagram can model counters / latest-value cells / ring depths / dirty flags without
   // any host JS. The behaviour layer mutates it through apply({verb,...}); expressions read a flat
-  // snapshot through env(). Verb → bucket:
-  //   count → counters    set → values    write/dirty/clean → cells{value,dirty}    push/drain → rings
+  // snapshot through env(). Verb -> bucket:
+  //   count -> counters    set -> values    write/dirty/clean -> cells{value,dirty}    push/drain -> rings
   // `write` is latest-wins: overwriting an un-cleaned (still-dirty) cell counts as a supersede,
-  // which `superseded` tallies — the latest-value-wins pattern, expressed as data.
+  // which `superseded` tallies -- the latest-value-wins pattern, expressed as data.
   class StateStore {
     constructor(){ this.reset(); }
     reset(){ this.counters={}; this.values={}; this.cells={}; this.rings={}; this.superseded=0; return this; }
@@ -830,20 +830,20 @@ const globalThis = __ns;
 
   const API = { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, Slot, Readout, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, Divider, Ghost, FlowSystem, FlowRuntime, StateStore, Diagram };
   if (typeof module!=='undefined' && module.exports) module.exports = API;
-  /* node:coverage disable */                         // browser UMD tail (window.Flowdot) — unreachable under node
+  /* node:coverage disable */                         // browser UMD tail (window.Flowdot) -- unreachable under node
   else global.Flowdot = API;
   /* node:coverage enable */
 })(typeof window!=='undefined' ? window : globalThis);
 
 
-/* ─────────── src/scene.js ─────────── */
+/* ----------- src/scene.js ----------- */
 /*
- * scene.js — a builder that turns a declarative scene (the IR) into Flowdot components.
+ * scene.js -- a builder that turns a declarative scene (the IR) into Flowdot components.
  *
  * This is step 1+2 of the language plan (see DIAGRAM-LANGUAGE-DESIGN.md): the IR is a plain
  * JSON-shaped object; the surface DSL, once it exists, will simply parse to this shape. The
- * builder is deliberately dumb — it instantiates components by `kind` and passes the spec
- * straight through — so the IR schema *is* the component spec, and the framework stays the one
+ * builder is deliberately dumb -- it instantiates components by `kind` and passes the spec
+ * straight through -- so the IR schema *is* the component spec, and the framework stays the one
  * source of rendering truth.
  *
  * IR shape (v0):
@@ -857,7 +857,7 @@ const globalThis = __ns;
  * to the built component; numeric [x,y] and functions pass through unchanged.
  *
  * The builder writes into any diagram-like target (real DK.Diagram in the browser, or a fake
- * recorder in tests) exposing add/addZone/addRoad/connector — so it is unit-testable in node
+ * recorder in tests) exposing add/addZone/addRoad/connector -- so it is unit-testable in node
  * without a canvas.
  *
  * UMD: attaches to `window.SceneBuilder` in the browser and `module.exports` under node.
@@ -870,7 +870,7 @@ const globalThis = __ns;
   // module-load time in the browser. Resolve it lazily (at buildFlows call time) rather than here.
   const getFlow = () => isNode ? require('./flow.js') : global.Flow;
 
-  // kind → factory(id, spec) → Component. Custom components register themselves so a diagram's
+  // kind -> factory(id, spec) -> Component. Custom components register themselves so a diagram's
   // bespoke kinds are still driven from the IR.
   const KINDS = {
     box:      (id, s) => new DK.Box(id, s),
@@ -884,7 +884,7 @@ const globalThis = __ns;
   };
   function register(kind, factory) { KINDS[kind] = factory; return API; }
 
-  // Resolve a port ref: [nodeId,'port'] where nodeId is a known component → [component,'port'].
+  // Resolve a port ref: [nodeId,'port'] where nodeId is a known component -> [component,'port'].
   // Everything else ([x,y], ()=>[x,y], or an already-resolved [component,'port']) passes through.
   function resolver(byId) {
     return ref => (Array.isArray(ref) && typeof ref[0] === 'string' && byId[ref[0]])
@@ -893,7 +893,7 @@ const globalThis = __ns;
 
   // Per-kind default dimensions (PlantUML-style): a node renders without the author giving a size.
   // These are the fallback w/h for each built-in kind; an explicit `w:`/`h:` (and lane-fill, below)
-  // always overrides. `matrix` self-sizes from rows×cols and `zone` is always given an explicit band,
+  // always overrides. `matrix` self-sizes from rowsxcols and `zone` is always given an explicit band,
   // so neither carries a default here. Exposed as API.dimDefaults so docs/tests read one source.
   const DIM_DEFAULTS = {
     box:      { w: 140, h: 56 },
@@ -907,7 +907,7 @@ const globalThis = __ns;
   };
 
   // Auto-layout defaults (GraphViz-lite): the outer margin around the track grid and the gap between
-  // adjacent lanes. Everything here only FILLS coordinates the author left blank — an explicit x/w on
+  // adjacent lanes. Everything here only FILLS coordinates the author left blank -- an explicit x/w on
   // a lane, y on a rail, or x/y on a node always wins, so mixed (some placed, some auto) diagrams and
   // every existing .flow file are unaffected.
   const LAYOUT_PAD = 24, LAYOUT_GAP = 24;
@@ -916,7 +916,7 @@ const globalThis = __ns;
 
   // Fill in any lane x/w and rail y that the author omitted, by evenly distributing tracks across the
   // diagram's width/height. `lane l` / `lane r` become two columns splitting the width; `rail row`
-  // becomes a single centred row. Returns fresh lane/rail arrays (pure — never mutates the IR).
+  // becomes a single centred row. Returns fresh lane/rail arrays (pure -- never mutates the IR).
   // Also returns effective W/H: when ir.width/ir.height is null but tracks exist, W/H are derived from
   // the track count so nodes distribute correctly even without an explicit `diagram WxH` statement.
   function autofillTracks(ir) {
@@ -947,8 +947,8 @@ const globalThis = __ns;
   // rail is auto-stacked: several such nodes in one lane spread evenly down it so they never overlap;
   // a lone one centres vertically. The transpose holds for a node on a rail with no lane: such nodes
   // spread evenly ACROSS the rail (a lone one centres horizontally). Any width/height still unset
-  // falls back to the kind default (DIM_DEFAULTS) so sizes are optional. `align` ∈ left|center|right,
-  // `inset` is the lane margin. Pure — returns a new nodes array.
+  // falls back to the kind default (DIM_DEFAULTS) so sizes are optional. `align`  in  left|center|right,
+  // `inset` is the lane margin. Pure -- returns a new nodes array.
   function indexById(arr) { const m = {}; (arr || []).forEach(e => { m[e.id] = e; }); return m; }
   // The tail of a self-documenting "unknown lane/rail" message: list the declared ids (or say there are
   // none) plus the fix, so the author (or an editor) sees the valid options without opening the docs.
@@ -975,9 +975,9 @@ const globalThis = __ns;
       const o = Object.assign({}, n);
       if (n.lane != null) {
         const L = lanes[n.lane];
-        if (!L) throw new Error('scene: node "' + n.id + '" references unknown lane "' + n.lane + '" — ' + trackOpts('lane', n.lane, lanes));
+        if (!L) throw new Error('scene: node "' + n.id + '" references unknown lane "' + n.lane + '" -- ' + trackOpts('lane', n.lane, lanes));
         const inset = n.inset != null ? n.inset : 12;
-        // Only fill from a track coordinate that actually resolved — a lane with no x/w in a diagram
+        // Only fill from a track coordinate that actually resolved -- a lane with no x/w in a diagram
         // with no width can't be auto-distributed, so leave the node's coord unset (kind default / no
         // NaN) rather than computing from undefined.
         if (o.w == null && L.w != null) o.w = L.w - 2 * inset;  // lane-fill wins over the kind default
@@ -990,7 +990,7 @@ const globalThis = __ns;
       }
       if (n.rail != null) {
         const R = rails[n.rail];
-        if (!R) throw new Error('scene: node "' + n.id + '" references unknown rail "' + n.rail + '" — ' + trackOpts('rail', n.rail, rails));
+        if (!R) throw new Error('scene: node "' + n.id + '" references unknown rail "' + n.rail + '" -- ' + trackOpts('rail', n.rail, rails));
         const h = o.h != null ? o.h : (d && d.h != null ? d.h : 0);  // rail-centre on effective height
         if (o.y == null && R.y != null) o.y = R.y - h / 2;
         if (o.x == null && n.lane == null && W != null) {       // transpose: auto-spread across the rail
@@ -1026,7 +1026,7 @@ const globalThis = __ns;
       const railIds = list(z.rails != null ? z.rails : z.rail);
       if (laneIds) {
         const Ls = laneIds.map(id => { const L = lanes[id];
-          if (!L) throw new Error('scene: zone "' + z.id + '" references unknown lane "' + id + '" — ' + trackOpts('lane', id, lanes));
+          if (!L) throw new Error('scene: zone "' + z.id + '" references unknown lane "' + id + '" -- ' + trackOpts('lane', id, lanes));
           return L; });
         const placed = Ls.filter(L => L.x != null);
         if (placed.length) {
@@ -1038,7 +1038,7 @@ const globalThis = __ns;
       }
       if (railIds) {
         const Rs = railIds.map(id => { const R = rails[id];
-          if (!R) throw new Error('scene: zone "' + z.id + '" references unknown rail "' + id + '" — ' + trackOpts('rail', id, rails));
+          if (!R) throw new Error('scene: zone "' + z.id + '" references unknown rail "' + id + '" -- ' + trackOpts('rail', id, rails));
           return R; });
         const ys = Rs.filter(R => R.y != null).map(R => R.y);
         if (ys.length) {                                          // span the named rails, padded half a band
@@ -1046,7 +1046,7 @@ const globalThis = __ns;
           if (o.y == null) o.y = top - V;
           if (o.h == null) o.h = (bot - top) + 2 * V;
         }
-      } else if (laneIds && H != null) {                          // lane band, no rails → full content height
+      } else if (laneIds && H != null) {                          // lane band, no rails -> full content height
         if (o.y == null) o.y = ZONE_TOP;
         if (o.h == null) o.h = H - ZONE_TOP - LAYOUT_PAD;
       }
@@ -1056,7 +1056,7 @@ const globalThis = __ns;
 
   // A headless, diagram-like build target: records what build()/buildFlows() add (components, zones,
   // roads, connectors + a real FlowSystem) without a canvas. The one recorder every non-canvas caller
-  // needs (the CLI, the harness, the golden guard, dry-validation, tests) — build() defaults to it.
+  // needs (the CLI, the harness, the golden guard, dry-validation, tests) -- build() defaults to it.
   function recorder() {
     return {
       components: [], zones: [], roads: [], connectors: [], annotations: [], legend: null, flow: new DK.FlowSystem(), now: 0,
@@ -1073,11 +1073,11 @@ const globalThis = __ns;
   }
 
   // Auto-declare tracks: a node (or a zone) may reference a `lane:`/`rail:` that was never declared with
-  // a `lane`/`rail` line — create it on the fly, ordered by FIRST APPEARANCE among the nodes (then zones).
+  // a `lane`/`rail` line -- create it on the fly, ordered by FIRST APPEARANCE among the nodes (then zones).
   // Explicitly declared tracks keep their declared order + coordinates (they stay first); referenced-only
   // ids are appended. So a fully implicit diagram gets first-appearance order, and an author writes a
-  // `lane`/`rail` line only to override the order or attach x/w/y — mirroring "coordinates are optional".
-  // Mutates ir.lanes/ir.rails in place (idempotent — a re-build creates nothing new) and returns warnings.
+  // `lane`/`rail` line only to override the order or attach x/w/y -- mirroring "coordinates are optional".
+  // Mutates ir.lanes/ir.rails in place (idempotent -- a re-build creates nothing new) and returns warnings.
   function autoDeclareTracks(ir) {
     const warnings = [];
     ['lane', 'rail'].forEach(kind => {
@@ -1090,11 +1090,11 @@ const globalThis = __ns;
         z[kind] != null ? z[kind] : [], z[listKey] != null ? z[listKey] : []).forEach(note));
       if (!created.length) return;
       ir[listKey] = (ir[listKey] || []).concat(created.map(id => ({ id })));
-      // Columns (lanes) track left→right declaration order reliably; ROWS inferred from node-declaration
-      // order can mis-place (an author may declare nodes in flow order, not top→bottom). So only rails
-      // warn, and only when 2+ are inferred (order matters). Informational — not fatal.
+      // Columns (lanes) track left->right declaration order reliably; ROWS inferred from node-declaration
+      // order can mis-place (an author may declare nodes in flow order, not top->bottom). So only rails
+      // warn, and only when 2+ are inferred (order matters). Informational -- not fatal.
       if (kind === 'rail' && created.length >= 2)
-        warnings.push('scene: inferred rail (row) order top→bottom = [' + created.join(', ') +
+        warnings.push('scene: inferred rail (row) order top->bottom = [' + created.join(', ') +
           '] from first use; add explicit `rail <id>` lines to control it if that order is wrong.');
     });
     return warnings;
@@ -1104,8 +1104,8 @@ const globalThis = __ns;
   // Returns { diagram, byId, edgesById }. Edges carrying an `id` are indexed in edgesById.
   // Resolve every colour attribute on a spec against the ACTIVE theme (Flowdot.resolveColor): a `#token`
   // or `#role` maps per theme, `#hex`/`#css-name` stay literal. Mutates + returns the spec; resolveColor
-  // is idempotent (a resolved #hex re-resolves to itself), so a re-build (theme toggle) is safe — and
-  // because the toggle re-mounts, build-time resolution is enough to flip dark↔light.
+  // is idempotent (a resolved #hex re-resolves to itself), so a re-build (theme toggle) is safe -- and
+  // because the toggle re-mounts, build-time resolution is enough to flip dark<->light.
   const COLOR_ATTRS = ['accent', 'color', 'tint', 'pulseColor', 'c', 'fill', 'stroke', 'glow'];
   function resolveColors(spec, theme) {
     if (!spec) return spec;
@@ -1165,16 +1165,16 @@ const globalThis = __ns;
   // fans a packet out to every option, both off the last route node.
   // ctx: { byId, diagram, rng? } where diagram exposes `.flow` (a FlowSystem) and `.now`; rng is an
   // optional ()=>[0,1) used for weighted picks (defaults to Math.random).
-  // Auto-derive faint connectors (opt-in via `auto-edges`): every flow route hop — including `|` pick
-  // and `&` fan-out branches (off the last route node) — gets a faint static Connector when no explicit
+  // Auto-derive faint connectors (opt-in via `auto-edges`): every flow route hop -- including `|` pick
+  // and `&` fan-out branches (off the last route node) -- gets a faint static Connector when no explicit
   // `edge`/`road` already joins that node pair. It is the "road" the moving dots ride, so the author
   // drops the duplicated `edge a -> b` lines. Templated hops (`worker{f}`, resolved per-fire) are skipped
-  // — they have no single node at build time. An explicit edge wins (its style stays); deduped across flows.
+  // -- they have no single node at build time. An explicit edge wins (its style stays); deduped across flows.
   function deriveEdges(ir, ctx) {
     if (!ir.autoEdges || !ir.flows) return;
     const plain = id => id != null && String(id).indexOf('{') < 0;      // skip runtime-templated ids
     const seen = new Set();
-    (ir.edges || []).forEach(e => {                                     // explicit edges/roads win → pre-seed
+    (ir.edges || []).forEach(e => {                                     // explicit edges/roads win -> pre-seed
       if (e.from && e.to && typeof e.from[0] === 'string' && typeof e.to[0] === 'string')
         seen.add(e.from[0] + ' ' + e.to[0]);
     });
@@ -1184,19 +1184,19 @@ const globalThis = __ns;
       if (seen.has(key)) return;
       seen.add(key);
       const a = ctx.byId[from.node], b = ctx.byId[to.node];
-      if (!a || !b) return;                                             // unknown node → leave it to flow build
+      if (!a || !b) return;                                             // unknown node -> leave it to flow build
       ctx.diagram.connector([a, from.port || 'out'], [b, to.port || 'in'], { alpha: 0.2 });
     };
     (ir.flows || []).forEach(f => {
       const r = f.route || [];
       for (let i = 0; i + 1 < r.length; i++) link(r[i], r[i + 1]);      // linear hops
-      if (f.fork && r.length) { const last = r[r.length - 1];          // branch: last route node → each option
+      if (f.fork && r.length) { const last = r[r.length - 1];          // branch: last route node -> each option
         (f.fork.options || []).forEach(o => link(last, o)); }
     });
   }
 
   function buildFlows(ir, ctx) {
-    // Safe mode (ctx.safe) — defence in depth for an IR handed in directly (bypassing the parser's
+    // Safe mode (ctx.safe) -- defence in depth for an IR handed in directly (bypassing the parser's
     // gate): the Tier-2 host escapes are refused before any flow is wired.
     if (ctx.safe) {
       const hasCall = as => (as || []).some(a => a.verb === 'call');
@@ -1225,13 +1225,13 @@ const globalThis = __ns;
       if (c instanceof DK.Readout) c.get = () => readLive(c.watch); });
     const Flow = getFlow();                                            // resolve now (all scripts loaded)
     // rand()/mode()/dirty()/now() built-ins for exprs. dirty(name) reads the store's per-cell dirty flag
-    // (set by `write`/`dirty`, cleared by `clean`/`drain`) so `every … when dirty(slot)` works. now()
-    // is the runtime clock in seconds (F17) — time-as-a-value, so `set last = now()` + a periodic guard
+    // (set by `write`/`dirty`, cleared by `clean`/`drain`) so `every ... when dirty(slot)` works. now()
+    // is the runtime clock in seconds (F17) -- time-as-a-value, so `set last = now()` + a periodic guard
     // `when now() - last >= W` expresses a window-boundary / silence watchdog with no host timer.
     const built = { rand, mode: name => rt.modeActive(name), dirty: name => store.isDirty(name), now: () => rt.now };
     // Tier-2 host escape: `model "<path>"` (node require) or `model <GlobalName>` (browser global);
     // ctx.model overrides. Resolved lazily on first `call`, then cached (a diagram may name a model
-    // it never calls). NB: not yet gated by a safe mode — that's a later task.
+    // it never calls). NB: not yet gated by a safe mode -- that's a later task.
     let _model, _modelDone = false;
     const getModel = () => {
       if (_modelDone) return _model;
@@ -1258,11 +1258,11 @@ const globalThis = __ns;
       if (!c) throw new Error('scene: flow "' + fl.id + '" references unknown node "' + id + '"');
       return c;
     };
-    // Store→component binding: when a verb's target names a built-in ring/matrix, drive that component
+    // Store->component binding: when a verb's target names a built-in ring/matrix, drive that component
     // too, so declarative state shows ON-CANVAS (the store stays the read model for expressions). Targets:
-    //   push/drain <ringId>              → RingBuffer.push()/drain() (queue depth / doorbell)
-    //   write/dirty/clean <matrixId.i.j> → that Matrix cell's value + freshness (latest-value, staleness)
-    // An unbound name (no matching component) touches only the store — unchanged behaviour.
+    //   push/drain <ringId>              -> RingBuffer.push()/drain() (queue depth / doorbell)
+    //   write/dirty/clean <matrixId.i.j> -> that Matrix cell's value + freshness (latest-value, staleness)
+    // An unbound name (no matching component) touches only the store -- unchanged behaviour.
     const driveComponent = (verb, name, value) => {
       if (name == null) return;
       const s = String(name), dot = s.indexOf('.');
@@ -1273,27 +1273,27 @@ const globalThis = __ns;
         else if (verb === 'drain') c.drain();                          // one item off the queue per drain
       } else if (c instanceof DK.Matrix && dot >= 0) {
         const seg = s.slice(dot + 1).split('.'), i = +seg[0], j = +seg[1];
-        if (!(i >= 0 && j >= 0 && i < c.rows && j < c.cols)) return;   // out-of-range cell → ignore (store still set)
+        if (!(i >= 0 && j >= 0 && i < c.rows && j < c.cols)) return;   // out-of-range cell -> ignore (store still set)
         if (verb === 'write') c.write(i, j, { value: value, fresh: 1 });
         else if (verb === 'dirty') c.write(i, j, { fresh: 1 });
         else if (verb === 'clean') { const cell = c.cell(i, j); if (cell) cell.fresh = 0; }
       } else if (c instanceof DK.Slot && dot < 0) {                    // F4: a single last-value slot, keyed by its own id
-        if (verb === 'write') c.set(value, ctx.diagram.now);           // produce a value (overwrite-while-dirty → supersede flash)
+        if (verb === 'write') c.set(value, ctx.diagram.now);           // produce a value (overwrite-while-dirty -> supersede flash)
         else if (verb === 'dirty') c.mark(ctx.diagram.now);
         else if (verb === 'clean') c.read();                           // subscriber read it
       }
     };
     // Component-method verbs (F5): call a real method on the bound component (no store side-effect).
-    //   highlight <matrixId>.row:i   → Matrix.highlightRow(i)   (the shard reading a whole row)
-    //   down/up   <matrixId>.col:j   → Matrix.setDown(j, …)      (a feed going DOWN / back UP)
-    //   surge     <ringId> [= n]     → RingBuffer.surge(n)       (a lane lapping under load; default 3)
+    //   highlight <matrixId>.row:i   -> Matrix.highlightRow(i)   (the shard reading a whole row)
+    //   down/up   <matrixId>.col:j   -> Matrix.setDown(j, ...)      (a feed going DOWN / back UP)
+    //   surge     <ringId> [= n]     -> RingBuffer.surge(n)       (a lane lapping under load; default 3)
     const driveMethod = (verb, name, amount) => {
       if (name == null) return;
       const s = String(name), dot = s.indexOf('.');
       const c = ctx.byId[dot >= 0 ? s.slice(0, dot) : s];
       if (!c) return;
       if (verb === 'surge') { if (c instanceof DK.RingBuffer) c.surge(amount != null ? amount : 3); return; }
-      if (verb === 'snapshot') {                                       // F18: bulk read — whole grid (no dot) or one row (`.row:i`)
+      if (verb === 'snapshot') {                                       // F18: bulk read -- whole grid (no dot) or one row (`.row:i`)
         if (c instanceof DK.Matrix) {
           if (dot < 0) c.snapshot(null, ctx.diagram.now);
           else { const seg = s.slice(dot + 1).split(':'); if (seg[0] === 'row') { const i = +seg[1]; if (i >= 0 && i < c.rows) c.snapshot(i, ctx.diagram.now); } }
@@ -1307,21 +1307,21 @@ const globalThis = __ns;
       else if ((verb === 'down' || verb === 'up') && kind === 'col' && idx < c.cols) c.setDown(idx, verb === 'down');
     };
     // F14: a mode can drive STATE (not just rate). On toggle, apply a mode's state effects on enter and
-    // revert them on exit — reusing the F5 method verbs (down⇄up, surge⇄negate) + a matrix decay multiplier.
+    // revert them on exit -- reusing the F5 method verbs (down<->up, surge<->negate) + a matrix decay multiplier.
     const applyModeEffect = (e, on) => {
       if (e.op === 'method') {
         if (e.verb === 'surge') { const c = ctx.byId[e.target]; const amt = e.amount != null ? e.amount : 3;
           if (c && c.surge) c.surge(on ? amt : -amt); return; }             // enter floods; exit drains the same
-        driveMethod(on ? e.verb : (e.verb === 'down' ? 'up' : 'down'), e.target);   // down⇄up on enter/exit
+        driveMethod(on ? e.verb : (e.verb === 'down' ? 'up' : 'down'), e.target);   // down<->up on enter/exit
       } else if (e.op === 'decayMul') { const c = ctx.byId[e.target];
         if (c && c.decayRate) c.decayRate = on ? c.decayRate * e.factor : c.decayRate / e.factor; }
     };
-    const modeState = {};                                                  // name → its state effects (method/decayMul)
+    const modeState = {};                                                  // name -> its state effects (method/decayMul)
     (ir.modes || []).forEach(m => { const st = (m.effects || []).filter(e => e.op === 'method' || e.op === 'decayMul');
       if (st.length) modeState[m.name] = st; });
     if (Object.keys(modeState).length)
       rt.onModeChange((name, on) => { const st = modeState[name]; if (st) for (const e of st) applyModeEffect(e, on); });
-    // Execute an action list. leg/style are the owning flow's (or handler's) builders — passed so a
+    // Execute an action list. leg/style are the owning flow's (or handler's) builders -- passed so a
     // `spawn` rebuilds legs in the right context. `p` (optional) is the current packet, for `drop`.
     const runActions = (actions, penv, leg, style, p) => { if (!actions) return;
       for (const a of actions) {
@@ -1340,7 +1340,7 @@ const globalThis = __ns;
           rt.after(a.delay, () => rt.emit(a.event, penv));
         } else if (a.verb === 'call') {                                // Tier-2 host escape into the model
           const model = getModel();
-          if (!model) throw new Error('scene: `call ' + a.fn + '` needs a model — add `model "…"` (or pass ctx.model)');
+          if (!model) throw new Error('scene: `call ' + a.fn + '` needs a model -- add `model "..."` (or pass ctx.model)');
           const fn = model[a.fn];
           if (typeof fn !== 'function') throw new Error('scene: model has no function "' + a.fn + '"');
           const ret = fn.apply(model, a.args.map(x => Flow.evalExpr(x, envOf(penv))));
@@ -1355,11 +1355,11 @@ const globalThis = __ns;
         }
       }
     };
-    // Fan-in / join barriers: `join <node> : <inputA> <inputB> …`. A barrier node fires (pulses + runs
+    // Fan-in / join barriers: `join <node> : <inputA> <inputB> ...`. A barrier node fires (pulses + runs
     // its arrival actions) only after every named input has arrived; each arrival is deduped by input id,
     // and the barrier resets once complete so a later round waits again. A packet arriving at a barrier
     // from a non-barrier input still travels; it just parks silently until the last input completes the set.
-    const joins = {};                                                   // node id → { inputs:Set, arrived:Set }
+    const joins = {};                                                   // node id -> { inputs:Set, arrived:Set }
     (ir.joins || []).forEach(j => {
       if (!ctx.byId[j.node]) throw new Error('scene: join references unknown node "' + j.node + '"');
       j.inputs.forEach(id => { if (!ctx.byId[id]) throw new Error('scene: join "' + j.node + '" references unknown input "' + id + '"'); });
@@ -1372,11 +1372,11 @@ const globalThis = __ns;
       b.arrived.clear(); return true;
     };
     // leg/style builders. fl supplies the error id + colour/r; usable by a flow OR an `on` handler.
-    // fl.color is a `#token`/`#hex` → resolve against the active theme (maps per theme), else theme.hot.
+    // fl.color is a `#token`/`#hex` -> resolve against the active theme (maps per theme), else theme.hot.
     const flowTheme = (ctx.diagram && ctx.diagram.theme) || DK.Theme;
     const styleFor = fl => () => ({ style: { color: DK.resolveColor(fl.color, flowTheme) || flowTheme.hot, r: fl.r || 3.4 } });
     const legFor = fl => { const style = styleFor(fl);
-      const leg = (a, b, penv) => {                             // a→b hop; pulses b + runs its actions on arrival
+      const leg = (a, b, penv) => {                             // a->b hop; pulses b + runs its actions on arrival
         const to = nodeOf(fl, tpl(b.node, penv)), toId = tpl(b.node, penv), fromId = tpl(a.node, penv);
         const barrier = joins[toId];                            // is the destination a fan-in barrier?
         return { from: [nodeOf(fl, fromId), tpl(a.port, penv) || 'out'], to: [to, tpl(b.port, penv) || 'in'],
@@ -1385,12 +1385,12 @@ const globalThis = __ns;
             if (to.pulse) to.pulse(ctx.diagram.now); runActions(b.actions, penv, leg, style, p);
           } };
       }; return leg; };
-    // `on <event>(params): actions` → a runtime event handler (fired by `after … : event` / emit).
+    // `on <event>(params): actions` -> a runtime event handler (fired by `after ... : event` / emit).
     (ir.events || []).forEach(ev => {
       const fl = { id: 'on ' + ev.name }, leg = legFor(fl), style = styleFor(fl);
       rt.onEvent(ev.name, arg => runActions(ev.actions, arg || {}, leg, style, null));
     });
-    // `every R per v in L [when C]: actions` → a per-entity periodic. Each list element binds `v`;
+    // `every R per v in L [when C]: actions` -> a per-entity periodic. Each list element binds `v`;
     // fires at rate R when the optional guard C holds. Runs its actions with v in the env.
     (ir.periodics || []).forEach(pd => {
       const fl = { id: 'every ' + pd.var }, leg = legFor(fl), style = styleFor(fl);
@@ -1405,19 +1405,19 @@ const globalThis = __ns;
     (ir.flows || []).forEach(fl => {
       const route = fl.route || [], fork = fl.fork;
       const branchable = fork && fork.options && fork.options.length;
-      if (route.length < (branchable ? 1 : 2)) return;           // need a prefix, or ≥2 for a plain route
+      if (route.length < (branchable ? 1 : 2)) return;           // need a prefix, or >=2 for a plain route
       route.forEach(r => { if (!isTpl(r.node)) nodeOf(fl, r.node); });   // validate static nodes up front
       if (branchable) fork.options.forEach(o => { if (!isTpl(o.node)) nodeOf(fl, o.node); });  // templates: at fire time
       const style = styleFor(fl);
       const leg = legFor(fl);
       // F15: a `#colour` on a hop or a branch option recolours THAT leg (the packet's fate drives its
-      // colour) — set on the leg's own style, which FlowSystem.draw prefers over the packet style. So a
+      // colour) -- set on the leg's own style, which FlowSystem.draw prefers over the packet style. So a
       // demux (`| ~d emitted #gold when q>0 | ~d suppressed #rose when q<0`) shows each outcome's colour,
       // and the option's destination node already flashes on arrival.
       const colorLeg = (bl, hop) => { if (hop && hop.color) { const c = DK.resolveColor(hop.color, flowTheme);
         if (c) bl.style = Object.assign({}, style().style, { color: c }); } return bl; };
-      // F3b: a hop `pipe.stages` expands into sub-legs across the target pipeline's stage:0…k ports,
-      // so the packet visibly WALKS the stages (decode→canonicalise→offer) instead of the stages
+      // F3b: a hop `pipe.stages` expands into sub-legs across the target pipeline's stage:0...k ports,
+      // so the packet visibly WALKS the stages (decode->canonicalise->offer) instead of the stages
       // blinking decoupled. Stage count lives on the built component (build-time), so expand here:
       // split the hop's dur evenly, and run its arrival actions on the last stage.
       const expandStages = penv => {
@@ -1451,7 +1451,7 @@ const globalThis = __ns;
         return penv;
       };
       rt.source({
-        interval: () => 1 / (fl.rate || 1),          // rate is packets-per-second → seconds-between = 1/rate
+        interval: () => 1 / (fl.rate || 1),          // rate is packets-per-second -> seconds-between = 1/rate
 
         guard: () => ctx.diagram.flow.size < (fl.max || 200),
         fire: () => {
@@ -1467,7 +1467,7 @@ const globalThis = __ns;
           if (fork.mode === 'pick') {
             const o = pick(penv);
             ctx.diagram.flow.spawn(prefix.concat([colorLeg(leg(from, o, penv), o)]), style());
-          } else {                                               // 'all' → fan out at the branch node
+          } else {                                               // 'all' -> fan out at the branch node
             const fan = () => fork.options.forEach(o => ctx.diagram.flow.spawn([colorLeg(leg(from, o, penv), o)], style()));
             if (!prefix.length) { fan(); return; }
             const last = prefix[prefix.length - 1], prev = last.onArrive;   // split once the packet arrives
@@ -1477,7 +1477,7 @@ const globalThis = __ns;
         },
       });
     });
-    // F10: a narration timeline — a scripted, looping sequence of (dwell, node(s), caption) steps that
+    // F10: a narration timeline -- a scripted, looping sequence of (dwell, node(s), caption) steps that
     // spotlights the step's node(s) and shows its caption, driven purely by the runtime clock (no JS,
     // no timers). Rendered as a Diagram overlay so it's deterministic from `now` and self-contained.
     const narr = ir.narration;
@@ -1508,21 +1508,21 @@ const globalThis = __ns;
   const API = { build, recorder, register, KINDS, resolveLayout, resolveZones, autoDeclareTracks, deriveEdges, buildFlows, dimDefaults: DIM_DEFAULTS,
     layoutDefaults: { pad: LAYOUT_PAD, gap: LAYOUT_GAP, autoSlotW: AUTO_SLOT_W, autoBandH: AUTO_BAND_H } };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
-  /* node:coverage disable */                         // browser UMD tail (window.SceneBuilder) — unreachable under node
+  /* node:coverage disable */                         // browser UMD tail (window.SceneBuilder) -- unreachable under node
   else global.SceneBuilder = API;
   /* node:coverage enable */
 })(typeof window !== 'undefined' ? window : globalThis);
 
 
-/* ─────────── src/flow.js ─────────── */
+/* ----------- src/flow.js ----------- */
 /*
- * flow.js — a tiny parser for the .flow structure language → the SceneBuilder IR.
+ * flow.js -- a tiny parser for the .flow structure language -> the SceneBuilder IR.
  *
  * This is step 5 of the language plan (DIAGRAM-LANGUAGE-DESIGN.md): surface syntax as sugar over
  * the proven IR. It is deliberately line-oriented and dependency-free (a hand-written scanner, no
  * grammar tool) so a .flow file still renders from file:// with no build step, matching the rest of
  * book/animation. It parses the STRUCTURE sub-language (topology); the behaviour block and the
- * concise `each …` / `pipe … : a | b` comprehension sugar from §5 are deferred — this is the
+ * concise `each ...` / `pipe ... : a | b` comprehension sugar from sec5 are deferred -- this is the
  * Mermaid-like half, and it emits exactly the { title, width, height, zones, nodes, edges } shape
  * that SceneBuilder.build() consumes.
  *
@@ -1534,8 +1534,8 @@ const globalThis = __ns;
  *   road  <from> ~> <to> [key:value ...]        # a Channel (fat animated edge)
  * where <from>/<to> is `id`, `id.port`, or `x,y`; an id with no port defaults to .out (from) / .in (to).
  * Colours carry a `#` sigil: `#hex` or a `#name` theme token (resolved against the theme at build; see
- * flowdot.js resolveColor). Values coerce: 12 → number, `#…` → colour token, a|b|c → array, "x" → string,
- * a bare token (no `:`) on node/zone → a boolean flag (e.g. `boxed`, `vertical`, `pinned`).
+ * flowdot.js resolveColor). Values coerce: 12 -> number, `#...` -> colour token, a|b|c -> array, "x" -> string,
+ * a bare token (no `:`) on node/zone -> a boolean flag (e.g. `boxed`, `vertical`, `pinned`).
  *
  * UMD: attaches to `window.Flow` in the browser and `module.exports` under node.
  */
@@ -1547,7 +1547,7 @@ const globalThis = __ns;
   const SPEC_VERSION = '1.0', SPEC_MAJOR = 1;
 
   // Split a line into whitespace-separated tokens, but keep a "quoted section" or a "[bracket list]"
-  // whole — so `name:"a b"` and `stages:[a, b, "c d"]` are each one token (spaces inside are kept).
+  // whole -- so `name:"a b"` and `stages:[a, b, "c d"]` are each one token (spaces inside are kept).
   // A hand scanner, not a regex: a single regex mis-pairs quotes when a line has several quoted
   // tokens (it can span from one token's closing quote to the next token's opening quote).
   function tokenize(line) {
@@ -1566,7 +1566,7 @@ const globalThis = __ns;
   const isQuoted = s => s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"';
   const unquote = s => isQuoted(s) ? s.slice(1, -1) : s;
 
-  // Split a bracket-list body on commas/whitespace, but not inside quotes: `a, b, "c d"` → 3 items.
+  // Split a bracket-list body on commas/whitespace, but not inside quotes: `a, b, "c d"` -> 3 items.
   function splitList(s) {
     const out = []; let buf = '', q = false;
     for (let i = 0; i < s.length; i++) {
@@ -1580,12 +1580,12 @@ const globalThis = __ns;
   }
 
   // Coerce a value token to number / array / string.
-  //   [a, b, "c d"] → array (comma/space separated, quote-aware); each element coerces.
-  //   "…"           → ALWAYS a literal string (quotes never make an array).
-  //   12/-3.5 → number · else the raw string (`#colour-token`, bareword, id.port, …).
+  //   [a, b, "c d"] -> array (comma/space separated, quote-aware); each element coerces.
+  //   "..."           -> ALWAYS a literal string (quotes never make an array).
+  //   12/-3.5 -> number - else the raw string (`#colour-token`, bareword, id.port, ...).
   function coerce(tok) {
     const quoted = tok[0] === '"';
-    // Template attribute: `(i,j)=>{expr}` (or `(i,j)=>expr`) → a function evaluated per call with the
+    // Template attribute: `(i,j)=>{expr}` (or `(i,j)=>expr`) -> a function evaluated per call with the
     // params bound (e.g. a Matrix cellNote). No spaces around `=>`. The body binds ONLY its params.
     if (tok[0] === '(') {
       const lm = /^\(([^)]*)\)=>([\s\S]+)$/.exec(tok);
@@ -1612,19 +1612,19 @@ const globalThis = __ns;
   }
 
   // Colours carry a `#` sigil (a #hex like #5cb4ff or a #name like #sky), or are an rgb()/hsl() function.
-  // The parser only enforces the SIGIL — a bareword like `red` (missing #) is the loud error. What a
-  // #name actually means is resolved against the active theme at BUILD time (scene → Flowdot.resolveColor):
+  // The parser only enforces the SIGIL -- a bareword like `red` (missing #) is the loud error. What a
+  // #name actually means is resolved against the active theme at BUILD time (scene -> Flowdot.resolveColor):
   // #hex/#css-name stay literal, #token/#role map per theme. The parser can't do that (theme tokens live
-  // in the renderer and custom themes register at runtime), so it defers — an unknown #token errors at build.
+  // in the renderer and custom themes register at runtime), so it defers -- an unknown #token errors at build.
   const COLOR_KEYS = new Set(['accent', 'color', 'colColors', 'tint', 'c', 'pulseColor', 'stroke', 'fill', 'glow']);
   const isColor = v => typeof v === 'string' && (v[0] === '#' || /^(rgb|rgba|hsl|hsla)\(/i.test(v));
   function validateColor(key, val, ln) {
     for (const v of (Array.isArray(val) ? val : [val])) if (!isColor(v))
-      throw new Error('flow: line ' + ln + ': "' + key + '" needs a colour with a "#" sigil — a #hex ' +
+      throw new Error('flow: line ' + ln + ': "' + key + '" needs a colour with a "#" sigil -- a #hex ' +
         '(#5cb4ff) or a #name (#sky), or rgb()/hsl(); got "' + v + '"');
   }
 
-  // Per-kind attribute schema — the top agent-safety guardrail: a misspelled/unknown key on a known
+  // Per-kind attribute schema -- the top agent-safety guardrail: a misspelled/unknown key on a known
   // built-in kind throws a located error listing the valid keys, instead of being silently kept.
   // Custom (registered) kinds are unknown to the parser, so they are NOT validated (pass through).
   const NODE_COMMON = ['id', 'kind', 'x', 'y', 'w', 'h', 'inspect', 'hoverable', 'lane', 'rail', 'align', 'inset', 'decay'];
@@ -1639,11 +1639,11 @@ const globalThis = __ns;
     zone:     ['id', 'kind', 'x', 'y', 'w', 'h', 'label', 'tint', 'accent', 'inspect', 'hoverable', 'lane', 'lanes', 'rail', 'rails'],
   };
   // Accepted style keys on an `edge` (a Connector). A key outside this set throws instead of being
-  // silently kept-and-ignored. Colour is a bare `#token` (→ `c`); `dashed` is a bare flag.
+  // silently kept-and-ignored. Colour is a bare `#token` (-> `c`); `dashed` is a bare flag.
   const EDGE_KEYS = new Set(['label', 'alpha', 'dash', 'dashed', 'c', 'pulseColor', 'lw', 'route']);
   function validateKeys(obj, kind, ln) {
     const allowed = KIND_KEYS[kind];
-    if (!allowed) return;                                          // custom/unknown kind → not our schema
+    if (!allowed) return;                                          // custom/unknown kind -> not our schema
     const set = new Set(allowed);
     for (const k of Object.keys(obj)) if (!set.has(k))
       throw new Error('flow: line ' + ln + ': "' + kind + '" has no attribute "' + k +
@@ -1653,7 +1653,7 @@ const globalThis = __ns;
   // Which attribute a BARE `#token` colour sets, per kind: box/core/pipeline/zone paint via `accent`,
   // ring/road/flow via `color`, edge via `c`. So `node q core #sky` == `accent:#sky`, `road a ~> b #emerald`
   // == `color:#emerald`. matrix has no single colour (its columns use `colColors`), so a bare colour on it
-  // lands on `color` and trips its schema — use `colColors:[…]` there.
+  // lands on `color` and trips its schema -- use `colColors:[...]` there.
   const KIND_COLOR_KEY = { box: 'accent', core: 'accent', slot: 'accent', readout: 'accent', pipeline: 'accent', zone: 'accent', ring: 'color' };
   const colorKeyFor = kind => KIND_COLOR_KEY[kind] || 'color';
   // Kinds whose single default colour a `colors <kind>:#tok` statement can override (they paint through
@@ -1662,26 +1662,26 @@ const globalThis = __ns;
   const OVERRIDE_KINDS = new Set(['box', 'core', 'ring', 'pipeline', 'zone', 'road', 'edge']);
 
   // Fold "flag" and "key:value" tokens into an object. A bare `#token`/rgb() (no key) is the element's
-  // colour — assigned to `colorKey` (the kind's colour attribute); its MEANING resolves at build.
+  // colour -- assigned to `colorKey` (the kind's colour attribute); its MEANING resolves at build.
   function applyKV(obj, toks, ln, colorKey) {
     for (const t of toks) {
       const c = t.indexOf(':');
       if (c > 0 && t[0] !== '"') { const key = t.slice(0, c), v = coerce(t.slice(c + 1));
         if (ln != null && COLOR_KEYS.has(key)) validateColor(key, v, ln);   // catch a typo'd colour name
         obj[key] = v; }
-      else if (colorKey && isColor(t)) obj[colorKey] = coerce(t);  // bare colour → the kind's colour attr
-      else obj[unquote(t)] = true;                                 // other bare token → boolean flag
+      else if (colorKey && isColor(t)) obj[colorKey] = coerce(t);  // bare colour -> the kind's colour attr
+      else obj[unquote(t)] = true;                                 // other bare token -> boolean flag
     }
     return obj;
   }
 
-  // ── comprehension layer: `set`, `rails = …`, `each … in …:`, and `{expr}` interpolation ──
+  // -- comprehension layer: `set`, `rails = ...`, `each ... in ...:`, and `{expr}` interpolation --
   // A preprocessor that expands loops/lists into the plain statements parse() already understands,
-  // so the two layers stay independent. This is the conciseness sugar from §5 of the design doc.
+  // so the two layers stay independent. This is the conciseness sugar from sec5 of the design doc.
 
   const coerceScalar = s => /^-?\d+(?:\.\d+)?$/.test(s) ? Number(s) : s;
 
-  // Evaluate a small expression. Grammar (loosest → tightest binding):
+  // Evaluate a small expression. Grammar (loosest -> tightest binding):
   //   or  := and ('||' and)*                       boolean
   //   and := eq  ('&&' eq)*
   //   eq  := cmp (('=='|'!=') cmp)*                 equality (strict)
@@ -1714,7 +1714,7 @@ const globalThis = __ns;
       if (t === 'dirty' && peek() === '(') { eat(); const name = eat(); expect(')');
         if (typeof env.dirty !== 'function') throw new Error('flow: dirty() is not available in this context');
         return env.dirty(name); }
-      if (t === 'now' && peek() === '(') { eat(); expect(')');       // F17: the runtime clock (seconds) — time-as-a-value, for window/silence guards
+      if (t === 'now' && peek() === '(') { eat(); expect(')');       // F17: the runtime clock (seconds) -- time-as-a-value, for window/silence guards
         if (typeof env.now !== 'function') throw new Error('flow: now() is not available in this context');
         return env.now(); }
       let v = env[t];                                            // identifier
@@ -1728,18 +1728,18 @@ const globalThis = __ns;
     function and() { let v = eq(); while (peek() === '&&') { eat(); const r = eq(); v = v && r; } return v; }
     function or() { let v = and(); while (peek() === '||') { eat(); const r = and(); v = v || r; } return v; }
     const v = or();
-    if (p !== toks.length)                                       // stray/unsupported token → don't silently drop it
+    if (p !== toks.length)                                       // stray/unsupported token -> don't silently drop it
       throw new Error('flow: bad expression "' + src.trim() + '" (unexpected "' + toks[p] + '")');
     return v;
   }
-  // `a..b` → [a..b] inclusive; a list name → its elements.
+  // `a..b` -> [a..b] inclusive; a list name -> its elements.
   function evalItems(spec, env) {
     const rg = /^(-?\d+)\.\.(-?\d+)$/.exec(spec);
     if (rg) { const out = []; for (let i = +rg[1]; i <= +rg[2]; i++) out.push(i); return out; }
     if (Array.isArray(env[spec])) return env[spec];
     throw new Error('flow: cannot iterate "' + spec + '"');
   }
-  // The closed set of behaviour verbs. A flow hop's `{ … }` on-arrival block begins with one of
+  // The closed set of behaviour verbs. A flow hop's `{ ... }` on-arrival block begins with one of
   // these, which is how interpolate() tells an action block apart from a `{expr}` (both use braces):
   // a brace whose first word is a verb is left literal for the flow parser; anything else is a value
   // expression and is evaluated (so a real interpolation typo still throws loudly).
@@ -1748,13 +1748,13 @@ const globalThis = __ns;
   // referencing one is left literal here and resolved later, not at expand time.
   const interpolate = (text, env, protect) => text.replace(/\{([^}]+)\}/g, (m, e, offset, full) => {
     const expr = e.trim();
-    if (full.slice(0, offset).trimEnd().endsWith('=>')) return m;            // lambda body → bind at render time
+    if (full.slice(0, offset).trimEnd().endsWith('=>')) return m;            // lambda body -> bind at render time
     if (ACTION_VERBS.test(expr)) return m;                                   // action block, not an expression
     if (protect && protect.length && new RegExp('\\b(' + protect.join('|') + ')\\b').test(expr)) return m;
     return String(evalExpr(expr, env));
   });
 
-  // Extract the pick-clause variable names from a `flow … pick v in L[, w in M] : route` line, so the
+  // Extract the pick-clause variable names from a `flow ... pick v in L[, w in M] : route` line, so the
   // preprocessor leaves `{v}` literal (pick vars bind per-fire at run time, not at expand time).
   function pickVarNames(text) {
     const m = /\bpick\s+([\s\S]+?)\s:\s/.exec(text);
@@ -1768,9 +1768,9 @@ const globalThis = __ns;
   const durOf = tok => { const m = /^~(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
   const rn = tok => { const d = tok.indexOf('.'); return d < 0 ? { node: tok } : { node: tok.slice(0, d), port: tok.slice(d + 1) }; };
 
-  // Parse a hop's `{ verb …; verb … }` block body into [Action]. Closed verb set; anything else is a
+  // Parse a hop's `{ verb ...; verb ... }` block body into [Action]. Closed verb set; anything else is a
   // loud, located error. set/write carry an expr string (evaluated at run time against the store).
-  // A linear route `a ~0.5 b ~0.6 c` → [{node:'a'},{node:'b',dur:0.5},{node:'c',dur:0.6}]. Used by
+  // A linear route `a ~0.5 b ~0.6 c` -> [{node:'a'},{node:'b',dur:0.5},{node:'c',dur:0.6}]. Used by
   // the `spawn` action (a secondary packet); no branches. Node refs may be `id.port` or `{tpl}`.
   function parseLinearRoute(str, ln) {
     const toks = str.trim().split(/\s+/);
@@ -1789,10 +1789,10 @@ const globalThis = __ns;
     return body.split(';').map(s => s.trim()).filter(Boolean).map(part => {
       let m;
       if ((m = /^count\s+([A-Za-z_]\w*)$/.exec(part))) return { verb: 'count', name: m[1] };
-      // target may carry a `{expr}` interpolation (F6) — e.g. `write grid.{i}.0` — resolved per-fire against the pick bindings.
+      // target may carry a `{expr}` interpolation (F6) -- e.g. `write grid.{i}.0` -- resolved per-fire against the pick bindings.
       if ((m = /^(set|write)\s+([A-Za-z_][\w.{}]*)\s*=\s*(.+)$/.exec(part))) return { verb: m[1], name: m[2], expr: m[3].trim() };
       if ((m = /^(push|drain|dirty|clean)\s+([A-Za-z_][\w.{}]*)$/.exec(part))) return { verb: m[1], name: m[2] };
-      // component-method verbs (F5): highlight <m>.row:i · down/up <m>.col:j · surge <ring> [= amount].
+      // component-method verbs (F5): highlight <m>.row:i - down/up <m>.col:j - surge <ring> [= amount].
       // target may carry `:` (row:/col:) and a `{pick}` interpolation.
       if ((m = /^(highlight|down|up)\s+([A-Za-z_][\w.:{}]*)$/.exec(part))) return { verb: m[1], name: m[2] };
       if ((m = /^surge\s+([A-Za-z_][\w.{}]*)(?:\s*=\s*(.+))?$/.exec(part))) return { verb: 'surge', name: m[1], expr: m[2] ? m[2].trim() : undefined };
@@ -1823,7 +1823,7 @@ const globalThis = __ns;
     (function run(rows, env) {
       for (let k = 0; k < rows.length; k++) {
         const r = rows[k]; let m;
-        // `set NAME = …`, or a bare `NAME = …` list (but not an edge/road, which use -> / ~>)
+        // `set NAME = ...`, or a bare `NAME = ...` list (but not an edge/road, which use -> / ~>)
         if ((m = /^set\s+([A-Za-z_]\w*)\s*=\s*(.+)$/.exec(r.text)) ||
             (!/[-~]>/.test(r.text) && (m = /^([A-Za-z_]\w*)\s*=\s*(.+)$/.exec(r.text)))) {
           vars[m[1]] = interpolate(m[2].trim(), Object.assign({}, vars, env)).split(/\s+/).map(coerceScalar);
@@ -1845,20 +1845,20 @@ const globalThis = __ns;
     return out;
   }
 
-  // Parse an endpoint ref: `x,y` → [num,num]; `id.port` → [id,port]; `id` → [id, defPort].
+  // Parse an endpoint ref: `x,y` -> [num,num]; `id.port` -> [id,port]; `id` -> [id, defPort].
   function ref(tok, defPort) {
     if (/^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/.test(tok)) { const p = tok.split(','); return [+p[0], +p[1]]; }
     const d = tok.indexOf('.');
     return d < 0 ? [tok, defPort] : [tok.slice(0, d), tok.slice(d + 1)];
   }
 
-  // ── module include: `import "<path.flow>"` ──────────────────────────────────────────────────────
+  // -- module include: `import "<path.flow>"` ------------------------------------------------------
   // A preprocessor that INLINES an imported source's text in place of the import line (before expand /
   // parse), so a shared node/theme library merges into the diagram. Resolution:
-  //   • opts.resolveImport(path, base) → text   — caller-supplied (the browser: preload / fetch first)
-  //   • else, under node: fs.readFileSync(path.resolve(base, path)) relative to the importing file
+  //   - opts.resolveImport(path, base) -> text   -- caller-supplied (the browser: preload / fetch first)
+  //   - else, under node: fs.readFileSync(path.resolve(base, path)) relative to the importing file
   // Cycles throw ("import cycle"); a missing file / null resolver throws ("cannot import"). Gated by
-  // safe mode (an import while safe → "disabled in safe mode"). `seen` is the current include chain.
+  // safe mode (an import while safe -> "disabled in safe mode"). `seen` is the current include chain.
   const IS_NODE = typeof module !== 'undefined' && module.exports;
   function resolveImportText(p, base, opts) {
     if (opts.resolveImport) {
@@ -1873,7 +1873,7 @@ const globalThis = __ns;
       catch (e) { throw new Error('flow: cannot import "' + p + '" (' + (e.code || 'read error') + ')'); }
       return { key: abs, text: text, base: path.dirname(abs) };
     }
-    throw new Error('flow: cannot import "' + p + '" — provide opts.resolveImport (no sync file read in the browser)');
+    throw new Error('flow: cannot import "' + p + '" -- provide opts.resolveImport (no sync file read in the browser)');
   }
   function inlineImports(text, opts, base, seen) {
     seen = seen || new Set();
@@ -1888,7 +1888,7 @@ const globalThis = __ns;
     }).join('\n');
   }
 
-  // parse(text, opts?) — opts.safe (default false) disables the Tier-2 / include escapes: a `model`,
+  // parse(text, opts?) -- opts.safe (default false) disables the Tier-2 / include escapes: a `model`,
   // `call`, or `import` in the source throws "disabled in safe mode". opts.resolveImport / opts.base
   // control `import` resolution (see inlineImports). boot()/embeds pass safe:true so untrusted `.flow`
   // (e.g. a live-edited or user-submitted source) can never read/execute host code.
@@ -1898,8 +1898,8 @@ const globalThis = __ns;
     text = inlineImports(text, opts, opts.base, null);               // merge `import`s (throws if safe)
     const ir = { zones: [], nodes: [], edges: [] };
     expand(text).forEach(({ text: line, ln }) => {
-      // Tokenize first, THEN drop a trailing comment — a comment starts at a STANDALONE `#` token
-      // (`… # note` → the space-separated `#`). A glued `#…` token (`#5ef2a0`, `#sky`, `#steelblue`)
+      // Tokenize first, THEN drop a trailing comment -- a comment starts at a STANDALONE `#` token
+      // (`... # note` -> the space-separated `#`). A glued `#...` token (`#5ef2a0`, `#sky`, `#steelblue`)
       // is a bare colour and survives; write comments with a space after the hash.
       const toks = tokenize(line);
       const ci = toks.findIndex(tk => tk === '#');
@@ -1907,7 +1907,7 @@ const globalThis = __ns;
       if (!t.length) return;
       const kw = t[0];
       switch (kw) {
-        case 'flowdot': {    // format version pragma: `flowdot 1` / `flowdot 1.2` → ir.version (major must be supported)
+        case 'flowdot': {    // format version pragma: `flowdot 1` / `flowdot 1.2` -> ir.version (major must be supported)
           const v = t[1], vm = /^(\d+)(?:\.(\d+))?$/.exec(v || '');
           if (!vm) throw new Error('flow: line ' + ln + ': flowdot version must be a number, got "' + (v || '') + '"');
           if (+vm[1] !== SPEC_MAJOR) throw new Error('flow: line ' + ln + ': unsupported flowdot version ' + v +
@@ -1929,9 +1929,9 @@ const globalThis = __ns;
           ir.behavior = true;
           break;
         }
-        case 'mode': {       // `mode <name>: <effect>; …` — spawn xN | tier>=k drain xM | down/up <m>.col:j | surge <ring> [= n] | decay <m> x<f>
+        case 'mode': {       // `mode <name>: <effect>; ...` -- spawn xN | tier>=k drain xM | down/up <m>.col:j | surge <ring> [= n] | decay <m> x<f>
           // Parsed off the raw line (mini-grammar with `;`/`>=`/`x` sigils the ws-tokenizer would
-          // fragment). Modes carry no #hex, so any `#` starts a comment → strip it.
+          // fragment). Modes carry no #hex, so any `#` starts a comment -> strip it.
           const src = line.split('#')[0];
           const m = /^mode\s+([A-Za-z_]\w*)\s*:\s*(.*)$/.exec(src.trim());
           if (!m) throw new Error('flow: line ' + ln + ': mode must be `mode <name>: <effects>`');
@@ -1940,8 +1940,8 @@ const globalThis = __ns;
             let e;
             if ((e = /^spawn\s+x(\d*\.?\d+)$/.exec(part))) effects.push({ op: 'rate', factor: Number(e[1]) });
             else if ((e = /^tier\s*>=\s*(\d+)\s+drain\s+x(\d*\.?\d+)$/.exec(part))) effects.push({ op: 'drainMul', tierFrom: Number(e[1]), factor: Number(e[2]) });
-            // F14: a mode can drive STATE, not just rate — the F5 method verbs applied on enter and
-            // reverted on exit (down⇄up, surge⇄drain), plus a decay-rate multiplier on a matrix.
+            // F14: a mode can drive STATE, not just rate -- the F5 method verbs applied on enter and
+            // reverted on exit (down<->up, surge<->drain), plus a decay-rate multiplier on a matrix.
             else if ((e = /^(down|up)\s+([A-Za-z_][\w.:]*)$/.exec(part))) effects.push({ op: 'method', verb: e[1], target: e[2] });
             else if ((e = /^surge\s+([A-Za-z_][\w.]*)(?:\s*=\s*(\d*\.?\d+))?$/.exec(part))) effects.push({ op: 'method', verb: 'surge', target: e[1], amount: e[2] != null ? Number(e[2]) : undefined });
             else if ((e = /^decay\s+([A-Za-z_][\w.]*)\s+x(\d*\.?\d+)$/.exec(part))) effects.push({ op: 'decayMul', target: e[1], factor: Number(e[2]) });
@@ -1950,7 +1950,7 @@ const globalThis = __ns;
           (ir.modes || (ir.modes = [])).push({ name: m[1], effects });
           break;
         }
-        case 'every': {      // `every <rate>[s] per <v> in <list> [when <cond>]: <actions>` → ir.periodics
+        case 'every': {      // `every <rate>[s] per <v> in <list> [when <cond>]: <actions>` -> ir.periodics
           const src = line.replace(/\s+#\s.*$/, '');   // strip a trailing `# comment` (space after #) but KEEP a glued `#token` (F7 colour on a spawn)
           const m = /^every\s+(\S+)\s+per\s+([A-Za-z_]\w*)\s+in\s+(\[[^\]]*\]|\S+?)(?:\s+when\s+(.+?))?\s*:\s*(.*)$/.exec(src.trim());
           if (!m || !m[5].trim()) throw new Error('flow: line ' + ln + ': every must be `every <rate> per <var> in <list> [when <cond>]: <actions>`');
@@ -1965,8 +1965,8 @@ const globalThis = __ns;
           (ir.periodics || (ir.periodics = [])).push(pd);
           break;
         }
-        case 'on': {         // `on <event>[(params)]: <actions>` → a named event handler (ir.events)
-          const src = line.split('#')[0];                              // handlers carry no #hex → any # is a comment
+        case 'on': {         // `on <event>[(params)]: <actions>` -> a named event handler (ir.events)
+          const src = line.split('#')[0];                              // handlers carry no #hex -> any # is a comment
           const m = /^on\s+([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/.exec(src.trim());
           if (!m || !m[3].trim()) throw new Error('flow: line ' + ln + ': on must be `on <event>[(params)]: <actions>`');
           const params = m[2] ? m[2].split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -1982,7 +1982,7 @@ const globalThis = __ns;
           ir.controls = true;
           break;
         }
-        case 'theme-toggle': {   // opt-in dark↔light toggle button; boot() auto-renders it (re-mounts on flip)
+        case 'theme-toggle': {   // opt-in dark<->light toggle button; boot() auto-renders it (re-mounts on flip)
           ir.themeToggle = true;
           break;
         }
@@ -1990,7 +1990,7 @@ const globalThis = __ns;
           ir.autoEdges = true;
           break;
         }
-        case 'colors': {         // per-kind colour override: `colors road:#emerald core:#sky` — a
+        case 'colors': {         // per-kind colour override: `colors road:#emerald core:#sky` -- a
           // diagram-wide default per kind, layered over the theme (inline #token wins; theme is the floor)
           const kc = ir.kindColors || (ir.kindColors = {});
           for (const tok of t.slice(1)) {
@@ -2004,7 +2004,7 @@ const globalThis = __ns;
           }
           break;
         }
-        case 'seed': {       // `seed 42` or `seed 0x51F0` → ir.seed (a number seeding the runtime RNG)
+        case 'seed': {       // `seed 42` or `seed 0x51F0` -> ir.seed (a number seeding the runtime RNG)
           const raw = t[1];
           const n = /^0x[0-9a-fA-F]+$/.test(raw || '') ? parseInt(raw, 16) : Number(raw);
           if (!Number.isFinite(n)) throw new Error('flow: line ' + ln + ': seed must be a number, got "' + raw + '"');
@@ -2025,7 +2025,7 @@ const globalThis = __ns;
           break;
         }
         case 'divider':
-        case 'rule': {   // F12: a free labelled line — `divider "label" x1,y1 -> x2,y2 [#colour] [solid]`.
+        case 'rule': {   // F12: a free labelled line -- `divider "label" x1,y1 -> x2,y2 [#colour] [solid]`.
           //             The label is optional; `solid` drops the default dashes. Not tied to any node.
           const ai = t.indexOf('->');
           if (ai < 1) throw new Error('flow: line ' + ln + ': ' + kw + ' must be `' + kw + ' ["label"] x1,y1 -> x2,y2 [#colour] [solid]`');
@@ -2036,12 +2036,12 @@ const globalThis = __ns;
             if (isColor(tk)) d.color = coerce(tk);
             else if (tk === 'solid') d.dashed = false;
             else if (tk === 'dashed') d.dashed = true;
-            else throw new Error('flow: line ' + ln + ': ' + kw + ' — unexpected "' + tk + '" (want #colour or solid/dashed)');
+            else throw new Error('flow: line ' + ln + ': ' + kw + ' -- unexpected "' + tk + '" (want #colour or solid/dashed)');
           }
           (ir.dividers || (ir.dividers = [])).push(d);
           break;
         }
-        case 'ghost': { // F16: a counterfactual callout — `ghost "caption" x,y [-> x2,y2] [#colour]`.
+        case 'ghost': { // F16: a counterfactual callout -- `ghost "caption" x,y [-> x2,y2] [#colour]`.
           //            Ghosts form a toggleable layer (hidden by default); accumulate into ir.ghosts.
           if (!t[1] || t[1][0] !== '"')
             throw new Error('flow: line ' + ln + ': ghost must be `ghost "caption" x,y [-> x2,y2] [#colour]`');
@@ -2051,7 +2051,7 @@ const globalThis = __ns;
           if (ai >= 0) { const [x2, y2] = xyCoord(t[ai + 1], ln, 'ghost'); gh.x2 = x2; gh.y2 = y2; }
           for (const tk of (ai >= 0 ? t.slice(ai + 2) : t.slice(3))) {   // trailing #colour only
             if (isColor(tk)) gh.color = coerce(tk);
-            else throw new Error('flow: line ' + ln + ': ghost — unexpected "' + tk + '" (want a #colour)');
+            else throw new Error('flow: line ' + ln + ': ghost -- unexpected "' + tk + '" (want a #colour)');
           }
           (ir.ghosts || (ir.ghosts = [])).push(gh);
           break;
@@ -2062,11 +2062,11 @@ const globalThis = __ns;
           (ir.legend || (ir.legend = [])).push({ label: unquote(t[1]), color: coerce(t[2]) });
           break;
         }
-        case 'narrate': {  // F10: a guided-story step — `narrate <dwell> <node…> : "<caption>"`. Steps
+        case 'narrate': {  // F10: a guided-story step -- `narrate <dwell> <node...> : "<caption>"`. Steps
           //                 accumulate in order and cycle on the clock, spotlighting the node(s) + caption.
           const ci = t.indexOf(':');
           if (ci < 0 || t[ci + 1] == null || t[ci + 1][0] !== '"')
-            throw new Error('flow: line ' + ln + ': narrate must be `narrate <dwell> <node…> : "<caption>"`');
+            throw new Error('flow: line ' + ln + ': narrate must be `narrate <dwell> <node...> : "<caption>"`');
           const dur = Number(t[1]);
           if (!(dur > 0)) throw new Error('flow: line ' + ln + ': narrate needs a positive dwell time (seconds), got "' + (t[1] == null ? '' : t[1]) + '"');
           const nodes = t.slice(2, ci);
@@ -2074,12 +2074,12 @@ const globalThis = __ns;
           (ir.narration || (ir.narration = { steps: [] })).steps.push({ dur, nodes, caption: unquote(t[ci + 1]) });
           break;
         }
-        case 'join': {   // fan-in barrier: `join <nodeId> : <inputA> <inputB> …` — the node fires
+        case 'join': {   // fan-in barrier: `join <nodeId> : <inputA> <inputB> ...` -- the node fires
           //                 (pulses + runs its arrival actions) only once every named input has arrived.
           const ci = t.indexOf(':');
           const inputs = ci >= 0 ? t.slice(ci + 1) : [];
           if (!t[1] || ci !== 2 || inputs.length < 2)
-            throw new Error('flow: line ' + ln + ': join must be `join <nodeId> : <inputA> <inputB> …` (≥2 inputs)');
+            throw new Error('flow: line ' + ln + ': join must be `join <nodeId> : <inputA> <inputB> ...` (>=2 inputs)');
           (ir.joins || (ir.joins = [])).push({ node: t[1], inputs });
           break;
         }
@@ -2152,7 +2152,7 @@ const globalThis = __ns;
           if (rt.length) {
             // a route node is `id` or `id.port` (port may contain ':', e.g. grid.colTop:0)
             const wOf = tok => { const m = /^@(\d*\.?\d+)$/.exec(tok || ''); return m ? Number(m[1]) : null; };
-            const colOf = tok => (typeof tok === 'string' && tok.length > 1 && tok[0] === '#') ? tok : null;   // F15: a `#colour` on a hop/branch → per-outcome packet colour
+            const colOf = tok => (typeof tok === 'string' && tok.length > 1 && tok[0] === '#') ? tok : null;   // F15: a `#colour` on a hop/branch -> per-outcome packet colour
             const actOf = tok => (tok && tok[0] === '{' && tok[tok.length - 1] === '}') ? tok.slice(1, -1) : null;
             const bad = msg => { throw new Error('flow: line ' + ln + ': ' + msg); };
             const clean = h => { const o = { node: h.node }; if (h.port != null) o.port = h.port; if (h.dur != null) o.dur = h.dur; if (h.color != null) o.color = h.color; if (h.actions != null) o.actions = h.actions; return o; };
@@ -2163,7 +2163,7 @@ const globalThis = __ns;
             const segs = [[]]; for (const x of rt) x === sep ? segs.push([]) : segs[segs.length - 1].push(x);
 
             // seg0 is the linear chain: a leading node then `~dur node [@weight] [{actions}]` hops.
-            // An `{ … }` token (on-arrival actions) may trail any node; `@weight` (branch) comes first.
+            // An `{ ... }` token (on-arrival actions) may trail any node; `@weight` (branch) comes first.
             const s0 = segs[0];
             let k = 0;
             if (!s0.length || durOf(s0[0]) != null) bad('flow route must start with a node');
@@ -2174,7 +2174,7 @@ const globalThis = __ns;
               const dur = durOf(s0[k]); if (dur == null) bad('expected "~dur" before "' + s0[k] + '"'); k++;
               if (s0[k] == null || durOf(s0[k]) != null || wOf(s0[k]) != null || colOf(s0[k]) != null || actOf(s0[k]) != null) bad('"~dur" without a node');
               const hop = Object.assign(rn(s0[k++]), { dur });
-              for (;;) {                                        // optional @weight / #colour / when — any order, before {actions}
+              for (;;) {                                        // optional @weight / #colour / when -- any order, before {actions}
                 const w = wOf(s0[k]); if (w != null) { hop.weight = w; k++; continue; }
                 const cc = colOf(s0[k]); if (cc != null) { hop.color = cc; k++; continue; }
                 if (s0[k] === 'when') { k++; const gt = []; while (k < s0.length && actOf(s0[k]) == null && wOf(s0[k]) == null && colOf(s0[k]) == null) gt.push(s0[k++]); if (!gt.length) bad('when needs a condition'); hop.guard = gt.join(' '); continue; }
@@ -2196,7 +2196,7 @@ const globalThis = __ns;
                 if (dur == null || seg[1] == null) bad('branch option must be "~dur node [@weight]"');
                 const h = Object.assign(rn(seg[1]), { dur });   // ~dur node [@weight] [#colour] [when <cond>] [{actions}]
                 let j = 2;
-                for (;;) {                                      // optional @weight / #colour / when — any order, before {actions}
+                for (;;) {                                      // optional @weight / #colour / when -- any order, before {actions}
                   const w = wOf(seg[j]); if (w != null) { h.weight = w; j++; continue; }
                   const cc = colOf(seg[j]); if (cc != null) { h.color = cc; j++; continue; }
                   if (seg[j] === 'when') { j++; const gt = []; while (j < seg.length && actOf(seg[j]) == null && wOf(seg[j]) == null && colOf(seg[j]) == null) gt.push(seg[j++]); if (!gt.length) bad('when needs a condition'); h.guard = gt.join(' '); continue; }
@@ -2223,24 +2223,24 @@ const globalThis = __ns;
 
   const API = { parse, tokenize, coerce, expand, interpolate, evalExpr, KIND_KEYS, NODE_COMMON, SPEC_VERSION, SPEC_MAJOR };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
-  /* node:coverage disable */                         // browser UMD tail (window.Flow) — unreachable under node
+  /* node:coverage disable */                         // browser UMD tail (window.Flow) -- unreachable under node
   else global.Flow = API;
   /* node:coverage enable */
 })(typeof window !== 'undefined' ? window : globalThis);
 
 
-/* ─────────── src/mount.js ─────────── */
+/* ----------- src/mount.js ----------- */
 /*
- * mount.js — the "batteries-included" entry: turn .flow text (or an IR) into a running diagram in
+ * mount.js -- the "batteries-included" entry: turn .flow text (or an IR) into a running diagram in
  * one call, and optionally with NO JavaScript at all.
  *
  * This is the top application layer over the three lower modules (Flowdot renderer, SceneBuilder,
- * Flow parser). It collapses the boilerplate every declarative page repeats —
- *     parse → new Diagram → build → buildFlows → onUpdate → start
+ * Flow parser). It collapses the boilerplate every declarative page repeats --
+ *     parse -> new Diagram -> build -> buildFlows -> onUpdate -> start
  * into `Flowdot.mount(canvas, dgmText)`, and adds an opt-in auto-boot so a page can be *just* a
  * `.flow` source plus the script include:
  *
- *     <script type="text/flow" data-flowdot data-seed="0x51F0"> …diagram source… </script>
+ *     <script type="text/flow" data-flowdot data-seed="0x51F0"> ...diagram source... </script>
  *
  * On load, `boot()` finds every `<script type="text/flow" data-flowdot>`, inserts a <canvas> after it,
  * and mounts the source into it. `data-seed` seeds the PRNG (reproducible weighted `pick`s);
@@ -2257,16 +2257,16 @@ const globalThis = __ns;
   const Flow   = isNode ? require('./flow.js')      : global.Flow;
 
   const isDiagramLike = t => t && typeof t.add === 'function' && typeof t.connector === 'function';
-  const toSeed = s => typeof s === 'number' ? s : Number(s);          // "0x51F0" / "123" → number
+  const toSeed = s => typeof s === 'number' ? s : Number(s);          // "0x51F0" / "123" -> number
   const resolveEl = t => typeof t === 'string'                        // selector | element | null
     ? (typeof document !== 'undefined' ? document.querySelector(t) : null) : t;
 
-  // mount(target, source, opts?) → { ir, diagram, rt, byId, edgesById }
+  // mount(target, source, opts?) -> { ir, diagram, rt, byId, edgesById }
   //   target : a Diagram-like object (used as-is), a <canvas> element, or a selector string.
   //   source : .flow text, or an already-parsed IR object.
   //   opts   : { seed?, rng?, diagram?:extraDiagramOpts, autoStart?:true, showSource? }.
-  //            showSource (selector | element) mirrors the raw .flow text into that element — the
-  //            "view the source" panel every demo used to wire by hand — so no page chrome is needed.
+  //            showSource (selector | element) mirrors the raw .flow text into that element -- the
+  //            "view the source" panel every demo used to wire by hand -- so no page chrome is needed.
   function mount(target, source, opts) {
     opts = opts || {};
     const safe = !!opts.safe;                                          // disable Tier-2 model/call/import
@@ -2277,7 +2277,7 @@ const globalThis = __ns;
       const el = resolveEl(opts.showSource);
       if (el) el.textContent = source;
     }
-    // Theme precedence: opts.diagram.theme (the toggle override) > `diagram … <theme>` (ir.theme) >
+    // Theme precedence: opts.diagram.theme (the toggle override) > `diagram ... <theme>` (ir.theme) >
     // the browser's prefers-color-scheme. `themeName` is the one actually used, surfaced on the result
     // so the toggle can label its initial state correctly.
     const themeName = (opts.diagram && opts.diagram.theme != null) ? opts.diagram.theme
@@ -2304,7 +2304,7 @@ const globalThis = __ns;
     else if (opts.autoStart !== false && typeof diagram.start === 'function') diagram.start();
 
     // Teardown: stop the loop + drop listeners, unchain our onUpdate, and neutralize the runtime so
-    // NOTHING fires on a further tick — the prerequisite for live-editing (re-mount into the same
+    // NOTHING fires on a further tick -- the prerequisite for live-editing (re-mount into the same
     // canvas without leaking timers/RAF/listeners). Idempotent.
     const dispose = () => {
       if (typeof diagram.dispose === 'function') diagram.dispose();
@@ -2317,7 +2317,7 @@ const globalThis = __ns;
     return { ir, diagram, rt, theme: themeName, byId: built.byId, edgesById: built.edgesById, dispose };
   }
 
-  // boot(root?, mountFn?) → [results] — mount every opted-in <script type="text/flow" data-flowdot>.
+  // boot(root?, mountFn?) -> [results] -- mount every opted-in <script type="text/flow" data-flowdot>.
   // Pure enough to test: pass a fake `root` (needs querySelectorAll + createElement) and mountFn.
   function boot(root, mountFn) {
     const doc = root || (typeof document !== 'undefined' ? document : null);
@@ -2331,7 +2331,7 @@ const globalThis = __ns;
       const opts = {};
       if (el.dataset && el.dataset.seed != null && el.dataset.seed !== '') opts.seed = el.dataset.seed;
       if (el.dataset && el.dataset.source) opts.showSource = el.dataset.source;   // mirror text into it
-      opts.safe = !(el.dataset && el.dataset.unsafe != null);           // embed = untrusted → safe by default (opt out: data-unsafe)
+      opts.safe = !(el.dataset && el.dataset.unsafe != null);           // embed = untrusted -> safe by default (opt out: data-unsafe)
       const res = run(canvas, (el.textContent || '').trim(), opts);
       canvas.__flowdot = res;                                         // handle for debugging / tests
       res.exportPNG = exportPNG(canvas, doc, res.ir && res.ir.title); // imperative: save the frame as PNG
@@ -2351,7 +2351,7 @@ const globalThis = __ns;
       function renderBars(r) {
         renderModeControls(doc, canvas, r);                           // zero-JS toggle per declared mode
         if (controlsOn(r)) renderTransportControls(doc, canvas, r);   // zero-JS play/pause + reset + speed
-        if (wantToggle) renderThemeToggle(doc, canvas, themeName, flipTheme);   // zero-JS dark↔light
+        if (wantToggle) renderThemeToggle(doc, canvas, themeName, flipTheme);   // zero-JS dark<->light
         if (ghostOn(r)) renderGhostToggle(doc, canvas, r.diagram);    // F16: zero-JS counterfactual layer toggle
       }
       const ghostOn = r => (el.dataset && el.dataset.ghostToggle != null) || (r && r.ir && r.ir.ghosts && r.ir.ghosts.length);
@@ -2363,7 +2363,7 @@ const globalThis = __ns;
         renderBars(current);
         return current;
       }
-      // Flip dark↔light and re-mount (the theme is fixed at Diagram construction, so a live swap IS a
+      // Flip dark<->light and re-mount (the theme is fixed at Diagram construction, so a live swap IS a
       // re-mount). The override lives in remountOpts.diagram.theme so a subsequent edit keeps it.
       function flipTheme() {
         themeName = themeName === 'light' ? 'dark' : 'light';
@@ -2399,7 +2399,7 @@ const globalThis = __ns;
             if (g) g.clearRect(0, 0, canvas.width, canvas.height);
             showError(doc, panel, e.message); return;
           }
-          try { remount(t); showError(doc, panel, null); }          // valid again → clear the error frame
+          try { remount(t); showError(doc, panel, null); }          // valid again -> clear the error frame
           catch (e) { showError(doc, panel, e.message); }           // belt-and-braces (validated above)
         }, delay);
         // Context-aware Ctrl/Cmd+Space completion, on by default for editable panels (opt out with
@@ -2413,7 +2413,7 @@ const globalThis = __ns;
     return out;
   }
 
-  // Auto-render a toggle <button> per mode declared in the source, right after the canvas — so a
+  // Auto-render a toggle <button> per mode declared in the source, right after the canvas -- so a
   // zero-JS page gets working mode toggles (e.g. `storm`) from the library alone. No-op when the
   // diagram declares no modes, or when the DOM/host can't create the elements (e.g. the node tests
   // with a bare recorder). The library provides the JS; the example page stays free of authored JS.
@@ -2435,7 +2435,7 @@ const globalThis = __ns;
     canvas.__fvModes = bar;
   }
 
-  // Auto-render a transport bar (play/pause · reset · speed) after the canvas — same mechanism as
+  // Auto-render a transport bar (play/pause - reset - speed) after the canvas -- same mechanism as
   // renderModeControls, opt-in via `data-controls` on the <script> or a `controls` line in the source.
   // Wired to Diagram.setPaused/setSpeed + FlowRuntime.reset; the page stays free of authored JS. No-op
   // without a real DOM or a non-diagram target (the node recorder).
@@ -2465,7 +2465,7 @@ const globalThis = __ns;
     add(rs);
 
     const sbtns = [0.5, 1, 2].map(s => {
-      const b = mk(s + '×', 'flow-speed');
+      const b = mk(s + 'x', 'flow-speed');
       if (s === (diagram.speed || 1) && b.classList) b.classList.add('on');
       b.onclick = () => { diagram.setSpeed(s); sbtns.forEach(x => x.classList && x.classList.toggle('on', x === b)); };
       add(b); return b;
@@ -2475,7 +2475,7 @@ const globalThis = __ns;
     canvas.__fvTransport = bar;
   }
 
-  // Auto-render a dark↔light theme toggle after the canvas — same mechanism as the mode/transport bars,
+  // Auto-render a dark<->light theme toggle after the canvas -- same mechanism as the mode/transport bars,
   // opt-in via `data-theme-toggle` on the <script> or a `theme-toggle` line in the source. The button
   // shows the ACTIVE theme; clicking calls back (boot re-mounts the source with the flipped theme). The
   // page stays free of authored JS. No-op without a real DOM (the node recorder passes a fake).
@@ -2493,7 +2493,7 @@ const globalThis = __ns;
     return bar;
   }
 
-  // Auto-render a "Ghost" toggle after the canvas — same mechanism as the theme/mode bars, opt-in via
+  // Auto-render a "Ghost" toggle after the canvas -- same mechanism as the theme/mode bars, opt-in via
   // `data-ghost-toggle` on the <script> or any `ghost` line in the source. Unlike the theme toggle it
   // needs NO re-mount: it just flips diagram.ghostOn, so the next frame shows/hides the counterfactual
   // overlay. The page stays free of authored JS. No-op without a real DOM or a non-diagram target.
@@ -2521,9 +2521,9 @@ const globalThis = __ns;
       ? !!global.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
   }
 
-  // prefers-color-scheme: the INITIAL theme when the source names none — 'dark' unless the browser
+  // prefers-color-scheme: the INITIAL theme when the source names none -- 'dark' unless the browser
   // asks for light (so themeless pages/tests without matchMedia stay dark, as before). An explicit
-  // `diagram … <theme>` (ir.theme) or an opts.diagram.theme override (the toggle) still wins upstream.
+  // `diagram ... <theme>` (ir.theme) or an opts.diagram.theme override (the toggle) still wins upstream.
   function prefersColorScheme(opts) {
     if (opts && opts.colorScheme != null) return opts.colorScheme;    // explicit override (tests / hosts)
     return (typeof global !== 'undefined' && global.matchMedia
@@ -2531,7 +2531,7 @@ const globalThis = __ns;
   }
 
   // Accessibility: label the canvas (role/aria-label/title from the diagram title) and give it a native
-  // text fallback — a <ul> of nodes/edges as canvas child content, read by screen readers / shown when
+  // text fallback -- a <ul> of nodes/edges as canvas child content, read by screen readers / shown when
   // the canvas can't render. No-op for a headless recorder (no `.cv` element).
   function applyA11y(diagram, ir) {
     const cv = diagram && diagram.cv;
@@ -2542,13 +2542,13 @@ const globalThis = __ns;
     if (!doc || !doc.createElement || !cv.appendChild) return;
     const end = r => Array.isArray(r) ? String(r[0]) : String(r);
     const ul = doc.createElement('ul');
-    (ir.nodes || []).forEach(n => { const li = doc.createElement('li'); li.textContent = (n.name || n.id) + ' — ' + n.kind; ul.appendChild(li); });
-    (ir.edges || []).forEach(e => { const li = doc.createElement('li'); li.textContent = end(e.from) + ' → ' + end(e.to); ul.appendChild(li); });
+    (ir.nodes || []).forEach(n => { const li = doc.createElement('li'); li.textContent = (n.name || n.id) + ' -- ' + n.kind; ul.appendChild(li); });
+    (ir.edges || []).forEach(e => { const li = doc.createElement('li'); li.textContent = end(e.from) + ' -> ' + end(e.to); ul.appendChild(li); });
     while (cv.firstChild) cv.removeChild(cv.firstChild);             // replace any prior fallback (re-mount)
     cv.appendChild(ul);
   }
 
-  // Save the current canvas frame as a PNG — native `canvas.toBlob` + a download link, zero-dep.
+  // Save the current canvas frame as a PNG -- native `canvas.toBlob` + a download link, zero-dep.
   // Returns a no-arg trigger; a no-op in a headless env (no toBlob / no createElement).
   function exportPNG(canvas, doc, name) {
     const file = String(name || 'diagram').replace(/[^\w.-]+/g, '-') + '.png';
@@ -2573,7 +2573,7 @@ const globalThis = __ns;
   }
 
   // Dry-validate a source WITHOUT touching the canvas: parse + build + compile flows into a throwaway
-  // recorder. Throws the same located error a real mount would — so an editable panel can catch it
+  // recorder. Throws the same located error a real mount would -- so an editable panel can catch it
   // and keep the last good diagram instead of tearing it down. Returns nothing; it's the throw we want.
   function validateSource(text, safe) {
     const ir = Flow.parse(text, { safe: !!safe });                 // parse errors (+ safe-mode gate)
@@ -2639,13 +2639,13 @@ const globalThis = __ns;
     });
   }
 
-  // ── Context-aware autocomplete for the editable panel ──────────────────────────────────────────
+  // -- Context-aware autocomplete for the editable panel ------------------------------------------
   // Statement keywords offered at the start of a line.
   const KEYWORDS = ['diagram', 'flow', 'seed', 'theme', 'set', 'import', 'model', 'colors',
     'lane', 'rail', 'zone', 'node', 'edge', 'road', 'flow', 'mode', 'every', 'on', 'call', 'note', 'legend', 'join'];
 
   // Best-effort scan of the declared `lane`/`rail` ids in a (possibly mid-edit) source. Tolerant of
-  // parse errors — a regex, not the parser — and understands the pipe form `lane a|b|c`.
+  // parse errors -- a regex, not the parser -- and understands the pipe form `lane a|b|c`.
   function declaredTracks(text, kw) {
     const ids = [], re = new RegExp('^\\s*' + kw + '\\s+(\\S+)', 'gm');
     let m;
@@ -2654,9 +2654,9 @@ const globalThis = __ns;
   }
 
   // PURE completion: given the full text + caret offset (+ the known kinds), return { items, from, to }
-  // — the words to offer and the [from,to) span the chosen word replaces. Three contexts: after
-  // `lane:`/`rail:` → declared track ids; the kind slot of a `node <id> ` line → kinds; the start of a
-  // line → statement keywords. No DOM — unit-testable on its own.
+  // -- the words to offer and the [from,to) span the chosen word replaces. Three contexts: after
+  // `lane:`/`rail:` -> declared track ids; the kind slot of a `node <id> ` line -> kinds; the start of a
+  // line -> statement keywords. No DOM -- unit-testable on its own.
   function suggest(text, caret, kinds) {
     text = text || ''; caret = caret == null ? text.length : caret;
     const before = text.slice(0, caret);
@@ -2674,7 +2674,7 @@ const globalThis = __ns;
 
   // Wire Ctrl/Cmd+Space completion onto an editable panel: a small popup of context suggestions with
   // arrow-key navigation, Enter/Tab to accept (dispatches `input` so the existing live-edit remounts),
-  // Escape/blur to dismiss. Defensive — a no-op without a real DOM. Returns a disposer.
+  // Escape/blur to dismiss. Defensive -- a no-op without a real DOM. Returns a disposer.
   function attachAutocomplete(panel, doc, kinds) {
     if (!panel || !panel.addEventListener || !doc || !doc.createElement) return () => {};
     let box = null, items = [], sel = 0, span = null;
@@ -2717,7 +2717,7 @@ const globalThis = __ns;
       close();
       if (panel.dispatchEvent) panel.dispatchEvent(typeof Event === 'function' ? new Event('input') : { type: 'input' });
     };
-    /* node:coverage disable */                                      // pixel positioning — browser layout only
+    /* node:coverage disable */                                      // pixel positioning -- browser layout only
     const place = () => {
       if (!box || !box.style || !panel.getBoundingClientRect) return;
       try {
@@ -2749,7 +2749,7 @@ const globalThis = __ns;
 
   const API = { mount, boot, liveEdit, wirePickers, suggest, attachAutocomplete, exportPNG, applyA11y, prefersReducedMotion, prefersColorScheme, renderTransportControls, renderThemeToggle };
   if (isNode) module.exports = API;
-  /* node:coverage disable */                         // browser UMD tail: attach + auto-boot on DOMContentLoaded — unreachable under node
+  /* node:coverage disable */                         // browser UMD tail: attach + auto-boot on DOMContentLoaded -- unreachable under node
   else {
     if (global.Flowdot) { global.Flowdot.mount = mount; global.Flowdot.boot = boot; }
     // auto-boot opted-in sources once the DOM is ready (no-op if there are none)
@@ -2762,7 +2762,7 @@ const globalThis = __ns;
 })(typeof window !== 'undefined' ? window : globalThis);
 
 
-/* ─────────── ESM named exports ─────────── */
+/* ----------- ESM named exports ----------- */
 const __F = __ns.Flowdot, __S = __ns.SceneBuilder, __Z = __ns.Flow;
 export const { Theme, Themes, registerTheme, resolveTheme, resolveColor, themeKindColor, NAMED_COLORS, Rng, Tween, Draw, Component, Box, Core, Slot, Readout, RingBuffer, Matrix, Pipeline, Zone, Channel, Connector, Note, Divider, Ghost, FlowSystem, FlowRuntime, StateStore, Diagram } = __F;
 export const SceneBuilder = __S;

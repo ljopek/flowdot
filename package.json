@@ -1,6 +1,6 @@
 {
   "name": "flowdot",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A compact language for animated data-flow diagrams on HTML canvas.",
   "type": "commonjs",
   "private": false,
